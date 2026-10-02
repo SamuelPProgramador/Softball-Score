@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Anotación en vivo — Prototipo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+<div class="wrap">
+<body data-page="jugadores">
+<div class="wrap">
+  <div id="mainnav"></div>
+
+  <div class="scoreboard">
+    <div class="sb-top">
+<div class="sb-teams">Mi Equipo <span class="vs">vs</span> <span id="rivalName">Rival</span></div>
+      <div class="sb-inning"><span id="inningArrow">▲</span> <span id="inningNum">1</span></div>
+    </div>
+    <div class="sb-main">
+      <div class="sb-score">
+        <div class="sb-score-item">
+          <div class="sb-score-label">Nosotros</div>
+          <div class="sb-score-num" id="ourScore">0</div>
+        </div>
+        <div class="sb-score-item">
+          <div class="sb-score-label">Rival</div>
+          <div class="sb-score-num" id="theirScore">0</div>
+        </div>
+      </div>
+      <div class="sb-outs">
+        <div class="sb-outs-label">Outs</div>
+        <div class="sb-outs-dots" id="outsDots">
+          <div class="out-dot"></div><div class="out-dot"></div><div class="out-dot"></div>
+        </div>
+      </div>
+    </div>
+    <div class="diamond-row">
+      <div class="diamond">
+        <div class="base home"></div>
+        <div class="base b1" id="baseFirst"></div>
+        <div class="base b2" id="baseSecond"></div>
+        <div class="base b3" id="baseThird"></div>
+      </div>
+      <div class="diamond-label">Corredores en base<br><b id="basesText">Bases vacías</b></div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="bateo">Bateo</button>
+    <button class="tab-btn" data-tab="pitcheo">Pitcheo</button>
+    <button class="tab-btn" data-tab="resumen">Resumen</button>
+  </div>
+
+  <!-- BATEO -->
+  <div class="panel active" id="panel-bateo">
+    <div class="batter-card" id="batterCard">
+      <div class="batter-eyebrow">Al bate</div>
+      <div class="batter-name-row">
+        <span class="batter-num" id="batterNum">#7</span>
+        <span class="batter-name" id="batterName">Cargando…</span>
+      </div>
+      <div class="batter-pos" id="batterPos"></div>
+      <div class="batter-line" id="batterLine"></div>
+      <div class="outcome-grid">
+        <button class="outcome-btn hit" data-result="1B">1B</button>
+        <button class="outcome-btn hit" data-result="2B">2B</button>
+        <button class="outcome-btn hit" data-result="3B">3B</button>
+        <button class="outcome-btn hit" data-result="HR">HR</button>
+        <button class="outcome-btn neutral" data-result="BB">BB</button>
+        <button class="outcome-btn neutral" data-result="E">Error</button>
+        <button class="outcome-btn out" data-result="K">K</button>
+        <button class="outcome-btn out" data-result="OUT">Out</button>
+      </div>
+      <div class="undo-row"><button class="undo-btn" id="undoBtn">Deshacer última jugada</button></div>
+    </div>
+
+    <div class="section-title">Alineación</div>
+    <div class="lineup-card" id="lineupList"></div>
+    <button class="btn" id="finishBtn" type="button" style="width:100%;margin-top:14px">Finalizar juego</button>  </div>
+
+  <!-- PITCHEO -->
+  <div class="panel" id="panel-pitcheo">
+    <select class="pitcher-select" id="pitcherSelect"></select>
+    <div class="stepper-grid">
+      <div class="stepper"><span class="stepper-label">Outs lanzados (IP)</span>
+        <div class="stepper-controls"><button class="stepper-btn" data-p="outs" data-d="-1">–</button><span class="stepper-val" id="p-outs">0</span><button class="stepper-btn" data-p="outs" data-d="1">+</button></div>
+      </div>
+      <div class="stepper"><span class="stepper-label">Ponches (K)</span>
+        <div class="stepper-controls"><button class="stepper-btn" data-p="k" data-d="-1">–</button><span class="stepper-val" id="p-k">0</span><button class="stepper-btn" data-p="k" data-d="1">+</button></div>
+      </div>
+      <div class="stepper"><span class="stepper-label">Bases por bolas</span>
+        <div class="stepper-controls"><button class="stepper-btn" data-p="bb" data-d="-1">–</button><span class="stepper-val" id="p-bb">0</span><button class="stepper-btn" data-p="bb" data-d="1">+</button></div>
+      </div>
+      <div class="stepper"><span class="stepper-label">Hits permitidos</span>
+        <div class="stepper-controls"><button class="stepper-btn" data-p="h" data-d="-1">–</button><span class="stepper-val" id="p-h">0</span><button class="stepper-btn" data-p="h" data-d="1">+</button></div>
+      </div>
+      <div class="stepper"><span class="stepper-label">Carreras</span>
+        <div class="stepper-controls"><button class="stepper-btn" data-p="r" data-d="-1">–</button><span class="stepper-val" id="p-r">0</span><button class="stepper-btn" data-p="r" data-d="1">+</button></div>
+      </div>
+      <div class="stepper"><span class="stepper-label">Carreras limpias</span>
+        <div class="stepper-controls"><button class="stepper-btn" data-p="er" data-d="-1">–</button><span class="stepper-val" id="p-er">0</span><button class="stepper-btn" data-p="er" data-d="1">+</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESUMEN -->
+  <div class="panel" id="panel-resumen">
+    <div class="section-title">Hoja de resultados (en vivo)</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Jugador</th><th>AB</th><th>H</th><th>2B</th><th>3B</th><th>HR</th><th>BB</th><th>K</th><th>CA</th><th>AVG</th>
+        </tr></thead>
+        <tbody id="resumenBody"></tbody>
+      </table>
+    </div>
+    <div class="section-title">Línea de pitcheo</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Pitcher</th><th>IP</th><th>K</th><th>BB</th><th>H</th><th>C</th><th>CL</th></tr></thead>
+        <tbody id="resumenPitcheo"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/static/js/nav.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>
