@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Equipo — Jugadores</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+<div class="wrap">
+<body data-page="jugadores">
+<div class="wrap">
+  <div id="mainnav"></div>
+
+  <div class="form-card">
+    <div class="section-title" style="margin-top:0" id="formTitle">Nuevo jugador</div>
+    <div class="form-grid">
+      <div class="full">
+        <label class="field-label" for="fName">Nombre</label>
+        <input class="input" id="fName" type="text" maxlength="40" placeholder="Ej: R. Fermín">
+      </div>
+      <div>
+        <label class="field-label" for="fNumber">Número</label>
+        <input class="input" id="fNumber" type="number" min="0" max="999" inputmode="numeric">
+      </div>
+      <div>
+        <label class="field-label" for="fPos">Posición</label>
+        <select class="input" id="fPos">
+          <option value="">—</option>
+          <option>P</option><option>C</option><option>1B</option><option>2B</option>
+          <option>3B</option><option>SS</option><option>LF</option><option>CF</option>
+          <option>RF</option><option>BD</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" id="saveBtn">Guardar</button>
+      <button class="btn secondary" id="cancelBtn" style="display:none">Cancelar</button>
+    </div>
+  </div>
+
+  <div class="section-title">Plantel</div>
+  <div class="lineup-card" id="playerList"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/js/nav.js"></script>
+<script src="/static/js/jugadores.js"></script>
+</body>
+</html>
