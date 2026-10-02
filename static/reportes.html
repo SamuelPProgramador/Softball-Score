@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Reportes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body data-page="reportes">
+<div class="wrap wide">
+  <div id="mainnav"></div>
+
+  <div class="form-card no-print">
+    <label class="field-label" for="gameSel">Juego</label>
+    <select class="input" id="gameSel"></select>
+    <div class="form-actions">
+      <button class="btn" id="printBtn" type="button">Imprimir / Guardar PDF</button>
+    </div>
+  </div>
+
+  <div id="sheet">
+    <div class="sheet-head">
+      <div class="sheet-title" id="sTitle"></div>
+      <div class="sheet-meta" id="sMeta"></div>
+      <div class="sheet-score" id="sScore"></div>
+    </div>
+
+    <div class="section-title">Bateo</div>
+    <div class="table-wrap"><table id="batTable"></table></div>
+
+    <div class="section-title">Pitcheo</div>
+    <div class="table-wrap"><table id="pitTable"></table></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/js/nav.js"></script>
+<script src="/static/js/reportes.js"></script>
+</body>
+</html>
