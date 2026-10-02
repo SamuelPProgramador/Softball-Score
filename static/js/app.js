@@ -207,6 +207,11 @@
       var data = await api("GET", "/api/games/" + gameId);
       var game = data.game;
       document.getElementById("rivalName").textContent = game.opponent;
+      if (window.teamReady) {
+        window.teamReady.then(function (t) {
+          document.getElementById("teamName").textContent = t.name;
+        });
+      }
 
       if (data.lineup.length === 0) {
         document.getElementById("batterName").textContent = "Sin orden al bate";

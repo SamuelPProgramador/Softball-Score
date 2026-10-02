@@ -125,7 +125,8 @@
       var lineup = r[0].lineup;
       var sheet = r[1];
 
-      $("sTitle").textContent = "Mi Equipo vs " + g.opponent;
+      var team = window.teamReady ? await window.teamReady : { name: "Mi Equipo" };
+      $("sTitle").textContent = team.name + " vs " + g.opponent;
       var meta = [fmtDate(g.date)];
       if (g.time) meta.push(g.time);
       if (g.location) meta.push(g.location);

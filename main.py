@@ -8,6 +8,7 @@ import models, schemas
 import stats
 from datetime import date
 from typing import Optional
+import re
 
 Base.metadata.create_all(bind=engine)
 
@@ -405,6 +406,41 @@ def dashboard(db: Session = Depends(get_db)):
             "ERA": _top([p for p in pitcheo if p["outs"] >= MIN_OUTS_LIDERES], "ERA", menor=True),
         },
     }
+
+
+# ---------- EQUIPO ----------
+def equipo_config(db: Session):
+    t = db.query(models.TeamSettings).first()
+    if not t:
+        t = models.TeamSettings(name="Mi Equipo", color="#E0AE45")
+        db.add(t)
+        db.commit()
+        db.refresh(t)
+    return t
+
+
+@app.get("/api/team")
+def ver_equipo(db: Session = Depends(get_db)):
+    return equipo_config(db)
+
+
+@app.put("/api/team")
+def guardar_equipo(data: schemas.TeamIn, db: Session = Depends(get_db)):
+    nombre = data.name.strip()
+    if not nombre:
+        raise HTTPException(400, "Escribe el nombre del equipo")
+    if not re.fullmatch(r"#[0-9A-Fa-f]{6}", data.color):
+        raise HTTPException(400, "Color no válido")
+    if data.logo:
+        if len(data.logo) > 400_000:
+            raise HTTPException(400, "El logo es demasiado grande")
+        if not re.match(r"^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$", data.logo):
+            raise HTTPException(400, "Formato de logo no válido")
+    t = equipo_config(db)
+    t.name, t.color, t.logo = nombre, data.color, (data.logo or None)
+    db.commit()
+    db.refresh(t)
+    return t
 
 
 # ---------- FRONTEND ----------

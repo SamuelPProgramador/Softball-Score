@@ -555,3 +555,11 @@ tr.total td { font-weight: 700; border-top: 1px solid var(--line-strong); }
   font-weight: 600;
 }
 .banner a { color: var(--chalk); }
+
+/* Identidad del equipo */
+.sidebar-team { display: flex; align-items: center; gap: 10px; padding: 4px 10px 14px; }
+.sidebar-logo { width: 40px; height: 40px; object-fit: contain; border-radius: 6px; background: var(--field-light); flex-shrink: 0; }
+.sidebar-teamname { font-size: 13px; font-weight: 600; color: var(--chalk); line-height: 1.2; }
+.logo-row { display: flex; align-items: center; gap: 12px; }
+.logo-prev { width: 72px; height: 72px; object-fit: contain; background: var(--field-light); border: 1px solid var(--line-strong); border-radius: var(--radius); }
+

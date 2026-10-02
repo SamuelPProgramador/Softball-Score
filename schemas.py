@@ -43,3 +43,10 @@ class PitchingIn(BaseModel):
 
 class SeasonIn(BaseModel):
     name: str
+
+
+class TeamIn(BaseModel):
+    name: str
+    color: str = "#E0AE45"
+    logo: Optional[str] = None
+

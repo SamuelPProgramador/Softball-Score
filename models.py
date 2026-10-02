@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Date, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Date, UniqueConstraint, Text
 from database import Base
 
 
@@ -71,3 +71,12 @@ class LineupSlot(Base):
     batting_order = Column(Integer, nullable=False)   # 1, 2, 3...
     player_id = Column(Integer, ForeignKey("players.id"), nullable=False)
     position = Column(String)                         # posición que juega ese día
+
+
+class TeamSettings(Base):
+    """Datos de mi equipo (una sola fila)."""
+    __tablename__ = "team_settings"
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False, default="Mi Equipo")
+    color = Column(String, default="#E0AE45")
+    logo = Column(Text)   # imagen reducida, guardada como data URL
