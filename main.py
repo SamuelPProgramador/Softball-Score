@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
@@ -9,6 +9,9 @@ import stats
 from datetime import date
 from typing import Optional
 import re
+import base64
+import zlib
+
 
 Base.metadata.create_all(bind=engine)
 
@@ -16,18 +19,49 @@ app = FastAPI(title="Softball Stats")
 
 
 # ---------- JUGADORES ----------
+FOTO_RE = re.compile(r"^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$")
+
+
+def _validar_foto(foto):
+    if foto and (len(foto) > 300_000 or not FOTO_RE.match(foto)):
+        raise HTTPException(400, "Foto no válida o demasiado grande")
+
+
+def _foto_v(p):
+    """Versión de la foto (para que el navegador sepa cuándo cambió)."""
+    return zlib.crc32(p.photo.encode()) if p.photo else None
+
+
+def _jugador_json(p):
+    return {"id": p.id, "name": p.name, "number": p.number,
+            "position": p.position, "active": p.active, "photo_v": _foto_v(p)}
+
+
 @app.get("/api/players")
 def listar_jugadores(db: Session = Depends(get_db)):
-    return db.query(models.Player).filter_by(active=True).order_by(models.Player.id).all()
+    jugadores = db.query(models.Player).filter_by(active=True).order_by(models.Player.id).all()
+    return [_jugador_json(p) for p in jugadores]
+
+
+@app.get("/api/players/{player_id}/photo")
+def foto_jugador(player_id: int, db: Session = Depends(get_db)):
+    p = db.get(models.Player, player_id)
+    if not p or not p.photo:
+        raise HTTPException(404, "Sin foto")
+    cabecera, _, datos = p.photo.partition(",")
+    tipo = cabecera[5:].split(";")[0]          # ej. image/jpeg
+    return Response(content=base64.b64decode(datos), media_type=tipo,
+                    headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.post("/api/players")
 def crear_jugador(data: schemas.PlayerIn, db: Session = Depends(get_db)):
+    _validar_foto(data.photo)
     p = models.Player(**data.model_dump())
     db.add(p)
     db.commit()
     db.refresh(p)
-    return p
+    return _jugador_json(p)
 
 
 @app.put("/api/players/{player_id}")
@@ -35,11 +69,15 @@ def editar_jugador(player_id: int, data: schemas.PlayerIn, db: Session = Depends
     p = db.get(models.Player, player_id)
     if not p or not p.active:
         raise HTTPException(404, "Jugador no encontrado")
-    for campo, valor in data.model_dump().items():
+    for campo, valor in data.model_dump(exclude={"photo"}).items():
         setattr(p, campo, valor)
+    # La foto solo cambia si viene en la petición (omitida = se conserva)
+    if "photo" in data.model_fields_set:
+        _validar_foto(data.photo)
+        p.photo = data.photo or None
     db.commit()
     db.refresh(p)
-    return p
+    return _jugador_json(p)
 
 
 @app.delete("/api/players/{player_id}")
@@ -50,7 +88,6 @@ def desactivar_jugador(player_id: int, db: Session = Depends(get_db)):
     p.active = False
     db.commit()
     return {"ok": True}
-
 
 def season_activa(db: Session):
     s = db.query(models.Season).filter_by(active=True).first()
@@ -81,7 +118,8 @@ def _orden(db: Session, game_id: int):
                .filter(models.LineupSlot.game_id == game_id)
                .order_by(models.LineupSlot.batting_order).all())
     return [{"batting_order": s.batting_order, "player_id": p.id, "name": p.name,
-             "number": p.number, "position": s.position or p.position}
+             "number": p.number, "position": s.position or p.position,
+             "photo_v": _foto_v(p)}
             for s, p in filas]
 
 
@@ -337,8 +375,7 @@ def stats_jugador(player_id: int, season_id: Optional[int] = None,
         if b or p:
             juegos.append({"game_id": g.id, "date": g.date, "opponent": g.opponent,
                            "bateo": b, "pitcheo": p})
-
-    return {"player": jugador, "season_id": sid,
+    return {"player": _jugador_json(jugador), "season_id": sid,
             "bateo": de_este(total["bateo"]), "pitcheo": de_este(total["pitcheo"]),
             "juegos": juegos}
 

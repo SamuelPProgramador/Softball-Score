@@ -4,4 +4,4 @@ __pycache__/
 venv/
 .vscode/
 softball.db
-migrar.py
+migrar*.py

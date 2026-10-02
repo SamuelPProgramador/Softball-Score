@@ -7,6 +7,7 @@ class PlayerIn(BaseModel):
     name: str
     number: Optional[int] = None
     position: Optional[str] = None
+    photo: Optional[str] = None
 
 
 class LineupIn(BaseModel):

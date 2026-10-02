@@ -1,6 +1,17 @@
 (function () {
   var editingId = null;
   var players = [];
+  var photoAction = "keep";   // keep = no tocar | set = nueva foto | remove = quitar
+  var photoData = null;
+
+  function photoUrl(p) { return "/api/players/" + p.id + "/photo?v=" + p.photo_v; }
+
+  function setPhotoPreview(src) {
+    var prev = document.getElementById("photoPrev");
+    prev.style.display = src ? "" : "none";
+    document.getElementById("rmPhoto").style.display = src ? "" : "none";
+    if (src) prev.src = src; else prev.removeAttribute("src");
+  }
 
   function toast(msg) {
     var t = document.getElementById("toast");
@@ -25,6 +36,9 @@
     document.getElementById("fPos").value = "";
     document.getElementById("formTitle").textContent = "Nuevo jugador";
     document.getElementById("cancelBtn").style.display = "none";
+    photoAction = "keep";
+    photoData = null;
+    setPhotoPreview(null);
   }
 
   function startEdit(p) {
@@ -34,6 +48,9 @@
     document.getElementById("fPos").value = p.position || "";
     document.getElementById("formTitle").textContent = "Editar jugador";
     document.getElementById("cancelBtn").style.display = "";
+    photoAction = "keep";
+    photoData = null;
+    setPhotoPreview(p.photo_v ? photoUrl(p) : null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -73,6 +90,17 @@
       del.textContent = "Quitar";
       del.addEventListener("click", function () { removePlayer(p); });
 
+      var av;
+      if (p.photo_v) {
+        av = document.createElement("img");
+        av.src = photoUrl(p);
+        av.alt = "";
+      } else {
+        av = document.createElement("span");
+        av.textContent = (p.name || "?").trim().charAt(0).toUpperCase();
+      }
+      av.className = "avatar avatar-sm" + (p.photo_v ? "" : " avatar-empty");
+      row.appendChild(av);
       row.appendChild(num);
       row.appendChild(name);
       row.appendChild(pos);
@@ -102,6 +130,8 @@
       number: numRaw === "" ? null : parseInt(numRaw, 10),
       position: pos || null
     };
+    if (photoAction === "set") body.photo = photoData;
+    else if (photoAction === "remove") body.photo = null;
     try {
       if (editingId) {
         await api("PUT", "/api/players/" + editingId, body);
@@ -133,5 +163,23 @@
 
   document.getElementById("saveBtn").addEventListener("click", save);
   document.getElementById("cancelBtn").addEventListener("click", resetForm);
+  document.getElementById("fPhoto").addEventListener("change", async function () {
+    var input = this;
+    var file = input.files[0];
+    if (!file) return;
+    try {
+      photoData = await window.resizeImage(file, 256, "image/jpeg", 0.85);
+      photoAction = "set";
+      setPhotoPreview(photoData);
+    } catch (e) {
+      toast("⚠ " + e.message);
+    }
+    input.value = "";
+  });
+  document.getElementById("rmPhoto").addEventListener("click", function () {
+    photoAction = "remove";
+    photoData = null;
+    setPhotoPreview(null);
+  });
   load();
 })();

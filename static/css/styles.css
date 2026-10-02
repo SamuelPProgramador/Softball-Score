@@ -563,3 +563,12 @@ tr.total td { font-weight: 700; border-top: 1px solid var(--line-strong); }
 .logo-row { display: flex; align-items: center; gap: 12px; }
 .logo-prev { width: 72px; height: 72px; object-fit: contain; background: var(--field-light); border: 1px solid var(--line-strong); border-radius: var(--radius); }
 
+/* Fotos de jugadores */
+.avatar { border-radius: 50%; object-fit: cover; background: var(--field-lighter); border: 1px solid var(--line-strong); flex-shrink: 0; }
+.avatar-sm { width: 32px; height: 32px; }
+.avatar-md { width: 52px; height: 52px; }
+.avatar-lg { width: 72px; height: 72px; }
+.avatar-empty { display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 14px; color: var(--chalk-dim); }
+.batter-name-row .avatar { align-self: center; }
+
+

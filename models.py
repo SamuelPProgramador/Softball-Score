@@ -9,6 +9,7 @@ class Player(Base):
     number = Column(Integer)
     position = Column(String)
     active = Column(Boolean, default=True)
+    photo = Column(Text)   # foto reducida, guardada como data URL
 
 
 class Game(Base):

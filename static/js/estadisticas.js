@@ -92,8 +92,18 @@
       var q = "?season_id=" + seasonId;
       var d = await api("/api/players/" + row.player_id + "/stats" + q);
       var p = d.player;
-      $("detailTitle").textContent =
-        (p.number == null ? "" : "#" + p.number + " ") + p.name + (p.position ? " · " + p.position : "");
+      var title = $("detailTitle");
+      title.innerHTML = "";
+      title.style.cssText = "display:flex;align-items:center;gap:10px";
+      if (p.photo_v) {
+        var im = document.createElement("img");
+        im.className = "avatar avatar-md";
+        im.alt = "";
+        im.src = "/api/players/" + p.id + "/photo?v=" + p.photo_v;
+        title.appendChild(im);
+      }
+      title.appendChild(document.createTextNode(
+        (p.number == null ? "" : "#" + p.number + " ") + p.name + (p.position ? " · " + p.position : "")));
 
       var tiles = $("detailTiles");
       tiles.innerHTML = "";

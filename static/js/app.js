@@ -221,7 +221,10 @@
       }
 
       roster = data.lineup.map(function (s) {
-        return { id: s.player_id, num: s.number == null ? "–" : s.number, name: s.name, pos: s.position || "" };
+        return {
+          id: s.player_id, num: s.number == null ? "–" : s.number, name: s.name, pos: s.position || "",
+          photo: s.photo_v ? "/api/players/" + s.player_id + "/photo?v=" + s.photo_v : null
+        };
       });
 
       var players = await api("GET", "/api/players");
@@ -269,6 +272,9 @@
     var b = currentBatter();
     var s = stats[b.id];
     document.getElementById("batterNum").textContent = "#" + b.num;
+    var ph = document.getElementById("batterPhoto");
+    if (b.photo) { ph.src = b.photo; ph.style.display = ""; }
+    else { ph.removeAttribute("src"); ph.style.display = "none"; }
     document.getElementById("batterName").textContent = b.name;
     document.getElementById("batterPos").textContent = b.pos;
     document.getElementById("batterLine").innerHTML =
