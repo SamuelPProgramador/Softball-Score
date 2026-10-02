@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Juegos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body data-page="juegos">
+<div class="wrap wide">
+  <div id="mainnav"></div>
+
+  <div class="section-title" style="margin-top:0">Calendario</div>
+  <div class="form-card">
+    <div class="cal-head">
+      <button class="btn-link" id="calPrev" type="button">◀ Anterior</button>
+      <span class="cal-title" id="calTitle"></span>
+      <button class="btn-link" id="calNext" type="button">Siguiente ▶</button>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+  </div>
+
+  <div class="form-card" id="formCard">
+    <div class="section-title" style="margin-top:0" id="formTitle">Nuevo juego</div>
+    <div class="form-grid">
+      <div>
+        <label class="field-label" for="fDate">Fecha</label>
+        <input class="input" id="fDate" type="date">
+      </div>
+      <div>
+        <label class="field-label" for="fTime">Hora</label>
+        <input class="input" id="fTime" type="time">
+      </div>
+      <div class="full">
+        <label class="field-label" for="fOpp">Rival</label>
+        <input class="input" id="fOpp" type="text" maxlength="50" placeholder="Nombre del equipo rival">
+      </div>
+      <div class="full">
+        <label class="field-label" for="fPlace">Lugar (opcional)</label>
+        <input class="input" id="fPlace" type="text" maxlength="60" placeholder="Estadio o cancha">
+      </div>
+    </div>
+
+    <div class="section-title">Orden al bate</div>
+    <div id="lineupBuilder"></div>
+    <div class="form-actions">
+      <button class="btn secondary" id="addSlotBtn" type="button">+ Agregar bateador</button>
+      <button class="btn secondary" id="fillAllBtn" type="button">Usar todo el plantel</button>
+    </div>
+    <div class="hint">Si el juego ya tiene jugadas anotadas, el orden al bate no se modifica.</div>
+
+    <div class="form-actions">
+      <button class="btn" id="saveBtn" type="button">Guardar juego</button>
+      <button class="btn secondary" id="cancelBtn" type="button" style="display:none">Cancelar</button>
+    </div>
+  </div>
+
+  <div class="section-title">Próximos juegos</div>
+  <div class="lineup-card" id="upcomingList"></div>
+
+  <div class="section-title">Finalizados</div>
+  <div class="lineup-card" id="doneList"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/js/nav.js"></script>
+<script src="/static/js/juegos.js"></script>
+</body>
+</html>
