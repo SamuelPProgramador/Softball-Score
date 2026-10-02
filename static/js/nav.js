@@ -1,6 +1,6 @@
 (function () {
   var items = [
-    { key: "dashboard",    label: "Dashboard",    href: null },
+    { key: "dashboard",    label: "Dashboard",    href: "/static/dashboard.html" },
     { key: "jugadores",    label: "Jugadores",    href: "/static/jugadores.html" },
     { key: "juegos",       label: "Juegos",       href: "/static/juegos.html" },
     { key: "estadisticas", label: "Estadísticas", href: "/static/estadisticas.html" },

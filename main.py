@@ -350,6 +350,63 @@ def hoja_resultados(game_id: int, db: Session = Depends(get_db)):
     return {"juego": g, **stats.calcular(db, game_id)}
 
 
+# ---------- DASHBOARD ----------
+MIN_AB_LIDERES = 3     # turnos mínimos para aparecer en líderes de AVG
+MIN_OUTS_LIDERES = 3   # outs mínimos (1 entrada) para aparecer en líderes de ERA
+
+
+def _top(lista, campo, n=3, menor=False):
+    base = sorted(lista, key=lambda x: x[campo], reverse=not menor)
+    if not menor:
+        base = [x for x in base if x[campo] > 0]
+    return [{"player_id": x["player_id"], "name": x["name"], "value": x[campo]}
+            for x in base[:n]]
+
+
+def _resultado(g):
+    a, b = g.our_score or 0, g.opp_score or 0
+    return "G" if a > b else ("P" if a < b else "E")
+
+
+@app.get("/api/dashboard")
+def dashboard(db: Session = Depends(get_db)):
+    temporada = season_activa(db)
+    juegos = db.query(models.Game).filter_by(season_id=temporada.id).all()
+
+    def clave(g):
+        return (g.date, g.time or "")
+
+    fin = sorted([g for g in juegos if g.status == "finalizado"], key=clave)
+    proximos = sorted([g for g in juegos
+                       if g.status == "programado" and g.date >= date.today()], key=clave)
+    en_juego = [g for g in juegos if g.status == "en_juego"]
+    resultados = [_resultado(g) for g in fin]
+
+    s = stats.calcular(db, season_id=temporada.id)
+    bateo, pitcheo = s["bateo"], s["pitcheo"]
+
+    return {
+        "season": temporada,
+        "record": {"played": len(fin), "wins": resultados.count("G"),
+                   "losses": resultados.count("P"), "ties": resultados.count("E")},
+        "runs": {"for": sum(g.our_score or 0 for g in fin),
+                 "against": sum(g.opp_score or 0 for g in fin)},
+        "form": resultados[-5:],
+        "live": en_juego[0] if en_juego else None,
+        "next": proximos[0] if proximos else None,
+        "last": fin[-1] if fin else None,
+        "leaders": {
+            "AVG": _top([b for b in bateo if b["AB"] >= MIN_AB_LIDERES], "AVG"),
+            "HR": _top(bateo, "HR"),
+            "RBI": _top(bateo, "RBI"),
+            "H": _top(bateo, "H"),
+            "SB": _top(bateo, "SB"),
+            "K": _top(pitcheo, "K"),
+            "ERA": _top([p for p in pitcheo if p["outs"] >= MIN_OUTS_LIDERES], "ERA", menor=True),
+        },
+    }
+
+
 # ---------- FRONTEND ----------
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -357,4 +414,4 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.get("/")
 def inicio():
     # Temporal: cuando exista el Dashboard, "/" apuntará allá
-    return RedirectResponse("/static/jugadores.html")
+    return RedirectResponse("/static/dashboard.html")

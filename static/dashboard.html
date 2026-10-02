@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body data-page="dashboard">
+<div class="wrap wide">
+  <div id="mainnav"></div>
+
+  <div id="liveBox"></div>
+
+  <div class="section-title" id="seasonTitle" style="margin-top:0">Temporada</div>
+  <div class="stat-tiles" id="summaryTiles"></div>
+
+  <div class="dash-grid" id="infoCards"></div>
+
+  <div class="section-title">Líderes de bateo</div>
+  <div class="dash-grid" id="batLeaders"></div>
+
+  <div class="section-title">Líderes de pitcheo</div>
+  <div class="dash-grid" id="pitLeaders"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/js/nav.js"></script>
+<script src="/static/js/dashboard.js"></script>
+</body>
+</html>
