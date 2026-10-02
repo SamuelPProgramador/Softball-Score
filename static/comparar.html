@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Comparar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body data-page="comparar">
+<div class="wrap wide">
+  <div id="mainnav"></div>
+
+  <div class="form-card">
+    <label class="field-label" for="seasonSel">Temporada</label>
+    <select class="input" id="seasonSel"></select>
+    <div class="section-title">Jugadores (elige de 2 a 4)</div>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tabBat" type="button">Bateo</button>
+    <button class="tab-btn" id="tabPit" type="button">Pitcheo</button>
+  </div>
+
+  <div class="table-wrap"><table id="cmpTable"></table></div>
+  <div class="hint">El mejor valor de cada fila aparece resaltado. Los totales de pitcheo no se ajustan por entradas lanzadas; para eso están ERA y WHIP.</div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/js/nav.js"></script>
+<script src="/static/js/comparar.js"></script>
+</body>
+</html>
