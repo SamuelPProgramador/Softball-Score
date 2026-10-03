@@ -3,14 +3,14 @@
 
   var BAT_COLS = [
     ["label", "Jugador"], ["pos", "Pos"], ["AB", "AB"], ["H", "H"], ["B2", "2B"], ["B3", "3B"],
-    ["HR", "HR"], ["RBI", "CI"], ["BB", "BB"], ["K", "K"], ["SB", "SB"], ["E", "E"], ["SF", "SF"], ["SH", "SH"],
+    ["HR", "HR"], ["RBI", "CI"], ["R", "CA"], ["BB", "BB"], ["K", "K"], ["SB", "SB"], ["E", "E"], ["SF", "SF"], ["SH", "SH"],
     ["AVG", "AVG", "rate"]
   ];
   var PIT_COLS = [
     ["name", "Pitcher"], ["IP", "IP"], ["H", "H"], ["R", "C"], ["ER", "CL"],
     ["BB", "BB"], ["K", "K"], ["ERA", "ERA", "dec2"]
   ];
-  var SUM_FIELDS = ["AB", "H", "B2", "B3", "HR", "RBI", "BB", "K", "SB", "E", "SF", "SH"];
+  var SUM_FIELDS = ["AB", "H", "B2", "B3", "HR", "RBI", "BB", "K", "SB", "E", "SF", "SH", "R"];
 
   function $(id) { return document.getElementById(id); }
   function el(tag, cls, text) {

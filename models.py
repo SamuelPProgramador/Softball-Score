@@ -39,6 +39,7 @@ class Play(Base):
     outs_made = Column(Integer, default=0)       # para calcular IP
     runs_scored = Column(Integer, default=0)
     earned_runs = Column(Integer, default=0)
+    moves = Column(Text)   # movimientos de corredores de la jugada (JSON)
 
 class PitchingLine(Base):
     """Línea de pitcheo de un pitcher en un juego (se guarda tal cual la captura el anotador)."""

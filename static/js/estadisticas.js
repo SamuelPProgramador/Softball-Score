@@ -2,7 +2,7 @@
   // [campo, encabezado, formato]
   var BAT_COLS = [
     ["name", "Jugador"], ["G", "G"], ["AB", "AB"], ["H", "H"], ["B2", "2B"], ["B3", "3B"],
-    ["HR", "HR"], ["RBI", "CI"], ["BB", "BB"], ["K", "K"], ["SB", "SB"], ["SF", "SF"], ["SH", "SH"],
+    ["HR", "HR"], ["RBI", "CI"], ["R", "CA"], ["BB", "BB"], ["K", "K"], ["SB", "SB"], ["SF", "SF"], ["SH", "SH"],
     ["AVG", "AVG", "rate"], ["OBP", "OBP", "rate"], ["SLG", "SLG", "rate"], ["OPS", "OPS", "rate"]
   ];
   var PIT_COLS = [

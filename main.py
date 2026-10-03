@@ -11,6 +11,7 @@ from typing import Optional
 import re
 import base64
 import zlib
+import json
 
 
 Base.metadata.create_all(bind=engine)
@@ -250,6 +251,7 @@ def listar_jugadas(game_id: int, db: Session = Depends(get_db)):
 def registrar_jugada(game_id: int, data: schemas.PlayIn, db: Session = Depends(get_db)):
     if not db.get(models.Game, game_id):
         raise HTTPException(404, "Juego no encontrado")
+    _validar_moves(data.moves)
     ultimo = db.query(func.max(models.Play.seq)).filter_by(game_id=game_id).scalar() or 0
     play = models.Play(game_id=game_id, seq=ultimo + 1, **data.model_dump())
     db.add(play)
@@ -267,7 +269,33 @@ def deshacer_jugada(play_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"ok": True}
 
+# ---------- AJUSTE DE CORREDORES ----------
+def _validar_moves(txt):
+    if txt is None:
+        return
+    try:
+        datos = json.loads(txt)
+    except ValueError:
+        raise HTTPException(400, "Movimientos no válidos")
+    if not isinstance(datos, list) or len(datos) > 8:
+        raise HTTPException(400, "Movimientos no válidos")
 
+
+@app.put("/api/plays/{play_id}")
+def ajustar_jugada(play_id: int, data: schemas.PlayAdjustIn, db: Session = Depends(get_db)):
+    play = db.get(models.Play, play_id)
+    if not play:
+        raise HTTPException(404, "Jugada no encontrada")
+    ultimo = db.query(func.max(models.Play.seq)).filter_by(game_id=play.game_id).scalar()
+    if play.seq != ultimo:
+        raise HTTPException(400, "Solo se puede ajustar la última jugada")
+    _validar_moves(data.moves)
+    play.moves = data.moves
+    play.outs_made = data.outs_made
+    play.runs_scored = data.runs_scored
+    play.rbi = data.rbi
+    db.commit()
+    return {"ok": True}
 
 # ---------- ESTADÍSTICAS ----------
 @app.get("/api/games/{game_id}/stats")

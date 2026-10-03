@@ -2,6 +2,7 @@ from collections import defaultdict
 from typing import Optional
 from sqlalchemy.orm import Session
 import models
+import json
 
 HITS = {"1B", "2B", "3B", "HR"}
 # No cuentan como turno oficial (AB): BB, HBP, SB y sacrificios
@@ -15,7 +16,7 @@ def _tasa(num, den):
 
 def _bateo_vacio():
     return dict(PA=0, AB=0, H=0, B1=0, B2=0, B3=0, HR=0, BB=0, K=0,
-                SB=0, E=0, RBI=0, SF =0, SH=0)
+                SB=0, E=0, RBI=0, SF=0, SH=0, R=0)
 
 
 def _pitcheo_vacio():
@@ -53,6 +54,15 @@ def calcular(db: Session, game_id: Optional[int] = None, season_id: Optional[int
         if r in ("BB", "K", "SB", "E", "SF", "SH"):
             b[r] += 1
         b["RBI"] += p.rbi
+        if p.moves:
+            try:
+                movs = json.loads(p.moves)
+            except ValueError:
+                movs = []
+            for m in movs:
+                if m.get("t") == 4 and m.get("p"):
+                    bateo[m["p"]]["R"] += 1
+                    juegos_bat[m["p"]].add(p.game_id)
 
     # ---- Pitcheo: sale de las líneas capturadas por pitcher ----
     pitcheo = defaultdict(_pitcheo_vacio)

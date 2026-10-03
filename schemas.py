@@ -31,6 +31,7 @@ class PlayIn(BaseModel):
     outs_made: int = 0
     runs_scored: int = 0
     earned_runs: int = 0
+    moves: Optional[str] = None
 
 
 class PitchingIn(BaseModel):
@@ -50,4 +51,10 @@ class TeamIn(BaseModel):
     name: str
     color: str = "#E0AE45"
     logo: Optional[str] = None
+
+class PlayAdjustIn(BaseModel):
+    moves: str
+    outs_made: int
+    runs_scored: int
+    rbi: int
 

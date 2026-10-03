@@ -16,7 +16,7 @@
     ourScore: 0,
     theirScore: 0,
     outs: 0,
-    bases: [false, false, false],
+    bases: [null, null, null],
     history: [],
     currentPitcherId: null
   };
@@ -47,33 +47,73 @@
 
   function currentBatter() { return roster[state.batterIndex]; }
 
-  function advanceRunners(basesToAdvance, batterReachesBase) {
-    // basesToAdvance: number of bases each existing runner moves
-    var runsScored = 0;
-    var newBases = [false, false, false];
-    for (var i = 2; i >= 0; i--) {
-      if (state.bases[i]) {
-        var dest = i + basesToAdvance;
-        if (dest >= 3) { runsScored++; }
-        else { newBases[dest] = true; }
-      }
-    }
-    if (batterReachesBase >= 0 && batterReachesBase < 3) newBases[batterReachesBase] = true;
-    else if (batterReachesBase >= 3) runsScored++;
-    state.bases = newBases;
-    return runsScored;
+  var lastPlayCtx = null;   // contexto de la última jugada (para ajustarla)
+
+  function nameOf(id) {
+    var p = roster.find(function (x) { return x.id === id; }) ||
+            pitchers.find(function (x) { return x.id === id; });
+    return p ? p.name : "?";
   }
 
-  function walkAdvance() {
-    // Force-advance logic for BB / Error-on-1st
-    var runsScored = 0;
+  // ---------- Movimiento de corredores ----------
+  // Un movimiento es { p: id del jugador, f: base de origen (0 = bateador, 1-3), t: destino }
+  // t: 0 = out, 1-3 = base, 4 = anotó
+  function defaultMoves(result, batterId) {
     var b = state.bases;
-    if (b[0] && b[1] && b[2]) { runsScored++; b[2] = true; b[1] = true; b[0] = true; }
-    else if (b[0] && b[1]) { b[2] = true; b[1] = true; b[0] = true; }
-    else if (b[0]) { b[1] = true; b[0] = true; }
-    else { b[0] = true; }
-    state.bases = b;
-    return runsScored;
+    var mv = [];
+    function advance(n) {
+      for (var i = 2; i >= 0; i--) {
+        if (b[i] !== null) mv.push({ p: b[i], f: i + 1, t: Math.min(i + 1 + n, 4) });
+      }
+    }
+    if (result === "1B") { advance(1); mv.push({ p: batterId, f: 0, t: 1 }); }
+    else if (result === "2B") { advance(2); mv.push({ p: batterId, f: 0, t: 2 }); }
+    else if (result === "3B") { advance(3); mv.push({ p: batterId, f: 0, t: 3 }); }
+    else if (result === "HR") { advance(4); mv.push({ p: batterId, f: 0, t: 4 }); }
+    else if (result === "BB" || result === "E") {
+      if (b[0] !== null) {
+        if (b[1] !== null) {
+          if (b[2] !== null) mv.push({ p: b[2], f: 3, t: 4 });
+          mv.push({ p: b[1], f: 2, t: 3 });
+        }
+        mv.push({ p: b[0], f: 1, t: 2 });
+      }
+      mv.push({ p: batterId, f: 0, t: 1 });
+    }
+    else if (result === "SF") {
+      if (b[2] !== null) mv.push({ p: b[2], f: 3, t: 4 });
+      mv.push({ p: batterId, f: 0, t: 0 });
+    }
+    else if (result === "SH") { advance(1); mv.push({ p: batterId, f: 0, t: 0 }); }
+    else { mv.push({ p: batterId, f: 0, t: 0 }); }   // K y OUT
+    return mv;
+  }
+
+  function applyMoves(moves) {
+    var nb = state.bases.slice();
+    var runs = 0, outs = 0;
+    moves.forEach(function (m) { if (m.f >= 1) nb[m.f - 1] = null; });
+    moves.forEach(function (m) {
+      if (m.t >= 1 && m.t <= 3) nb[m.t - 1] = m.p;
+      else if (m.t === 4) { runs++; if (stats[m.p]) stats[m.p].r++; }
+      else if (m.t === 0) outs++;
+    });
+    state.bases = nb;
+    state.outs += outs;
+    return { runs: runs, outs: outs };
+  }
+
+  function sacrificeError(result) {
+    var b = state.bases;
+    if (result === "SF") {
+      if (!b[2]) return "El fly de sacrificio necesita un corredor en 3ra";
+      if (state.outs >= 2) return "Con 2 outs no cuenta como sacrificio: usa Out";
+    }
+    if (result === "SH") {
+      if (!(b[0] || b[1] || b[2])) return "El toque de sacrificio necesita corredores en base";
+      if (state.outs >= 2) return "Con 2 outs no cuenta como sacrificio: usa Out";
+    }
+    return null;
   }
 
   // ---------- Conexión con el servidor ----------
@@ -109,70 +149,48 @@
     state.ourScore = 0;
     state.theirScore = 0;
     state.outs = 0;
-    state.bases = [false, false, false];
+    state.bases = [null, null, null];
     playIds = [];
+    lastPlayCtx = null;
   }
 
-    // Sacrificios: el out cuenta, pero no es turno oficial.
-  // allAdvance = true (toque): todos avanzan una base; false (fly): solo anota el de 3ra.
-  function sacrificeAdvance(allAdvance) {
-    var b = state.bases;
-    var runs = b[2] ? 1 : 0;
-    var nb = [false, false, false];
-    if (allAdvance) {
-      if (b[1]) nb[2] = true;
-      if (b[0]) nb[1] = true;
-    } else {
-      nb[0] = b[0];
-      nb[1] = b[1];
-    }
-    state.bases = nb;
-    return runs;
-  }
-
-  function sacrificeError(result) {
-    var b = state.bases;
-    if (result === "SF") {
-      if (!b[2]) return "El fly de sacrificio necesita un corredor en 3ra";
-      if (state.outs >= 2) return "Con 2 outs no cuenta como sacrificio: usa Out";
-    }
-    if (result === "SH") {
-      if (!(b[0] || b[1] || b[2])) return "El toque de sacrificio necesita corredores en base";
-      if (state.outs >= 2) return "Con 2 outs no cuenta como sacrificio: usa Out";
-    }
-    return null;
-  }
-
-
-  // Aplica una jugada al estado local (sin tocar el servidor)
-  function applyResult(result) {
+  // Aplica una jugada al estado local (sin tocar el servidor).
+  // movesOverride: movimientos guardados; si no hay, se usa el avance proyectado.
+  function applyResult(result, movesOverride) {
     var batter = currentBatter();
     var s = stats[batter.id];
     var inning = state.inning;
-    var runs = 0, outsMade = 0;
+    var outsBefore = state.outs;
+    var basesBefore = state.bases.slice();
+    var moves = movesOverride || defaultMoves(result, batter.id);
 
-    if (result === "1B") { s.ab++; s.h++; s["1b"]++; runs = advanceRunners(1, 0); }
-    else if (result === "2B") { s.ab++; s.h++; s["2b"]++; runs = advanceRunners(2, 1); }
-    else if (result === "3B") { s.ab++; s.h++; s["3b"]++; runs = advanceRunners(3, 2); }
-    else if (result === "HR") { s.ab++; s.h++; s.hr++; runs = advanceRunners(3, 3); }
-    else if (result === "BB") { s.bb++; runs = walkAdvance(); }
-    else if (result === "E") { s.ab++; runs = walkAdvance(); }
-    else if (result === "K") { s.ab++; s.k++; state.outs++; outsMade = 1; }
-    else if (result === "OUT") { s.ab++; state.outs++; outsMade = 1; }
-    else if (result === "SF") { s.sf++; state.outs++; outsMade = 1; runs = sacrificeAdvance(false); }
-    else if (result === "SH") { s.sh++; state.outs++; outsMade = 1; runs = sacrificeAdvance(true); }
+    if (result === "1B") { s.ab++; s.h++; s["1b"]++; }
+    else if (result === "2B") { s.ab++; s.h++; s["2b"]++; }
+    else if (result === "3B") { s.ab++; s.h++; s["3b"]++; }
+    else if (result === "HR") { s.ab++; s.h++; s.hr++; }
+    else if (result === "BB") { s.bb++; }
+    else if (result === "E") { s.ab++; }
+    else if (result === "K") { s.ab++; s.k++; }
+    else if (result === "OUT") { s.ab++; }
+    else if (result === "SF") { s.sf++; }
+    else if (result === "SH") { s.sh++; }
 
-    if (runs > 0) { s.rbi += runs; state.ourScore += runs; }
+    var res = applyMoves(moves);
+    if (res.runs > 0) { s.rbi += res.runs; state.ourScore += res.runs; }
     state.batterIndex = (state.batterIndex + 1) % roster.length;
 
     var inningEnded = false;
     if (state.outs >= 3) {
       state.outs = 0;
-      state.bases = [false, false, false];
+      state.bases = [null, null, null];
       state.inning++;
       inningEnded = true;
     }
-    return { batter: batter, inning: inning, runs: runs, outsMade: outsMade, inningEnded: inningEnded };
+
+    lastPlayCtx = { playId: null, result: result, batterId: batter.id,
+                    bases: basesBefore, outs: outsBefore, moves: moves };
+    return { batter: batter, inning: inning, runs: res.runs, outsMade: res.outs,
+             inningEnded: inningEnded, moves: moves };
   }
 
   function recordResult(result) {
@@ -181,9 +199,11 @@
     var err = sacrificeError(result);
     if (err) { toast(err); return; }
     var info = applyResult(result);
+    var ctx = lastPlayCtx;
     toast(info.inningEnded
       ? "Fin de la entrada — pasa a la entrada " + state.inning
-      : info.batter.name + " — " + result);
+      : info.batter.name + " — " + result +
+        (info.runs ? " · " + info.runs + (info.runs === 1 ? " carrera" : " carreras") : ""));
     render();
     enqueue(async function () {
       var saved = await api("POST", "/api/games/" + gameId + "/plays", {
@@ -192,9 +212,11 @@
         result: result,
         rbi: info.runs,
         outs_made: info.outsMade,
-        runs_scored: info.runs
+        runs_scored: info.runs,
+        moves: JSON.stringify(info.moves)
       });
       playIds.push(saved.id);
+      ctx.playId = saved.id;
     });
   }
 
@@ -214,11 +236,128 @@
     });
   }
 
+  // ---------- Ajustar corredores de la última jugada ----------
+  var DEST = [[0, "Out"], [1, "1ra base"], [2, "2da base"], [3, "3ra base"], [4, "Anotó"]];
+  var BASE_LABEL = ["", "1ra", "2da", "3ra"];
+
+  function openAdjust() {
+    if (readOnly) { toast("Juego finalizado: solo lectura"); return; }
+    var ctx = lastPlayCtx;
+    if (!ctx || !ctx.playId) { toast("Aún no hay una jugada para ajustar"); return; }
+
+    var rows = [];
+    for (var i = 2; i >= 0; i--) {
+      if (ctx.bases[i] !== null) rows.push({ p: ctx.bases[i], f: i + 1 });
+    }
+    rows.push({ p: ctx.batterId, f: 0 });
+    rows.forEach(function (r) {
+      var m = ctx.moves.find(function (x) { return x.p === r.p && x.f === r.f; });
+      r.t = m ? m.t : r.f;   // sin movimiento: se queda donde estaba
+    });
+
+    var back = document.createElement("div");
+    back.className = "modal-backdrop";
+    var box = document.createElement("div");
+    box.className = "modal";
+
+    var title = document.createElement("div");
+    title.className = "modal-title";
+    title.textContent = "Ajustar corredores";
+    var sub = document.createElement("div");
+    sub.className = "modal-sub";
+    sub.textContent = "Jugada: " + nameOf(ctx.batterId) + " — " + ctx.result +
+                      ". Elige dónde terminó cada uno.";
+    box.appendChild(title);
+    box.appendChild(sub);
+
+    var selects = [];
+    rows.forEach(function (r) {
+      var row = document.createElement("div");
+      row.className = "modal-row";
+      var lab = document.createElement("span");
+      lab.textContent = nameOf(r.p) + (r.f === 0 ? " (bateador)" : " (en " + BASE_LABEL[r.f] + ")");
+      var sel = document.createElement("select");
+      sel.className = "pitcher-select";
+      sel.style.marginBottom = "0";
+      DEST.forEach(function (d) {
+        if (d[0] !== 0 && d[0] < r.f) return;   // no se puede retroceder
+        var o = document.createElement("option");
+        o.value = d[0];
+        o.textContent = d[1];
+        sel.appendChild(o);
+      });
+      sel.value = r.t;
+      selects.push(sel);
+      row.appendChild(lab);
+      row.appendChild(sel);
+      box.appendChild(row);
+    });
+
+    var errBox = document.createElement("div");
+    errBox.className = "modal-error";
+    box.appendChild(errBox);
+
+    var actions = document.createElement("div");
+    actions.className = "form-actions";
+    var cancel = document.createElement("button");
+    cancel.className = "btn secondary";
+    cancel.type = "button";
+    cancel.textContent = "Cancelar";
+    var save = document.createElement("button");
+    save.className = "btn";
+    save.type = "button";
+    save.textContent = "Guardar";
+    actions.appendChild(save);
+    actions.appendChild(cancel);
+    box.appendChild(actions);
+    back.appendChild(box);
+    document.body.appendChild(back);
+
+    function close() { document.body.removeChild(back); }
+    cancel.addEventListener("click", close);
+    back.addEventListener("click", function (e) { if (e.target === back) close(); });
+
+    save.addEventListener("click", function () {
+      var moves = rows.map(function (r, idx) {
+        return { p: r.p, f: r.f, t: parseInt(selects[idx].value, 10) };
+      });
+      var taken = {};
+      for (var k = 0; k < moves.length; k++) {
+        var t = moves[k].t;
+        if (t >= 1 && t <= 3) {
+          if (taken[t]) { errBox.textContent = "Dos corredores no pueden estar en la misma base"; return; }
+          taken[t] = true;
+        }
+      }
+      var runs = moves.filter(function (m) { return m.t === 4; }).length;
+      var outsMade = moves.filter(function (m) { return m.t === 0; }).length;
+      if (ctx.outs + outsMade > 3) { errBox.textContent = "No puede haber más de 3 outs en la entrada"; return; }
+
+      close();
+      enqueue(async function () {
+        await api("PUT", "/api/plays/" + ctx.playId, {
+          moves: JSON.stringify(moves),
+          outs_made: outsMade,
+          runs_scored: runs,
+          rbi: runs
+        });
+        await loadGame();
+        toast("Corredores ajustados");
+      });
+    });
+  }
+
   // Carga el juego: reconstruye bases, outs, marcador y estadísticas repitiendo las jugadas
   async function loadGame() {
     resetLocal();
     var plays = await api("GET", "/api/games/" + gameId + "/plays");
-    plays.forEach(function (p) { applyResult(p.result); playIds.push(p.id); });
+    plays.forEach(function (p) {
+      var mv = null;
+      if (p.moves) { try { mv = JSON.parse(p.moves); } catch (e) { mv = null; } }
+      applyResult(p.result, mv);
+      playIds.push(p.id);
+      if (lastPlayCtx) lastPlayCtx.playId = p.id;
+    });
     var lines = await api("GET", "/api/games/" + gameId + "/pitching");
     lines.forEach(function (l) {
       if (pitching[l.player_id]) {
@@ -297,9 +436,9 @@
     document.getElementById("baseSecond").classList.toggle("occupied", state.bases[1]);
     document.getElementById("baseThird").classList.toggle("occupied", state.bases[2]);
     var names = [];
-    if (state.bases[0]) names.push("1ra");
-    if (state.bases[1]) names.push("2da");
-    if (state.bases[2]) names.push("3ra");
+    ["1ra", "2da", "3ra"].forEach(function (label, i) {
+      if (state.bases[i]) names.push(label + ": " + nameOf(state.bases[i]));
+    });
     document.getElementById("basesText").textContent = names.length ? names.join(" · ") : "Bases vacías";
   }
 
@@ -369,7 +508,7 @@
       var tr = document.createElement("tr");
       tr.innerHTML =
         "<td>#" + p.num + " " + p.name + "</td><td>" + s.ab + "</td><td>" + s.h + "</td><td>" + s["2b"] +
-        "</td><td>" + s["3b"] + "</td><td>" + s.hr + "</td><td>" + s.bb + "</td><td>" + s.k + "</td><td>" + s.rbi +
+        "</td><td>" + s["3b"] + "</td><td>" + s.hr + "</td><td>" + s.bb + "</td><td>" + s.k + "</td><td>" + s.rbi + "</td><td>" + s.r +
         "</td><td>" + fmtAvg(s) + "</td>";
       body.appendChild(tr);
     });
@@ -422,7 +561,8 @@
     });
   });
 
-    document.getElementById("finishBtn").addEventListener("click", function () {
+  document.getElementById("adjustBtn").addEventListener("click", openAdjust);
+  document.getElementById("finishBtn").addEventListener("click", function () {
     if (readOnly) { location.href = "/static/juegos.html"; return; }
     if (!confirm("¿Finalizar el juego? Ya no podrás anotar más jugadas.")) return;
     enqueue(async function () {

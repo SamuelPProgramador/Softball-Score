@@ -12,6 +12,7 @@
     { key: "B3",  label: "Triples (3B)", better: "high" },
     { key: "HR",  label: "Jonrones (HR)", better: "high" },
     { key: "RBI", label: "Impulsadas (CI)", better: "high" },
+    { key: "R",   label: "Anotadas (CA)", better: "high" },
     { key: "BB",  label: "Boletos (BB)", better: "high" },
     { key: "K",   label: "Ponches (K)", better: "low" },
     { key: "SB",  label: "Bases robadas (SB)", better: "high" },
