@@ -42,7 +42,7 @@
     t.textContent = msg;
     t.classList.add("show");
     clearTimeout(toast._tm);
-    toast._tm = setTimeout(function () { t.classList.remove("show"); }, 1400);
+    toast._tm = setTimeout(function () { t.classList.remove("show"); }, 2200);
   }
 
   function currentBatter() { return roster[state.batterIndex]; }
@@ -99,7 +99,7 @@
     stats = {};
     pitching = {};
     roster.forEach(function (p) {
-      stats[p.id] = { ab: 0, h: 0, "1b": 0, "2b": 0, "3b": 0, hr: 0, bb: 0, k: 0, rbi: 0, r: 0 };
+      stats[p.id] = { ab: 0, h: 0, "1b": 0, "2b": 0, "3b": 0, hr: 0, bb: 0, k: 0, rbi: 0, r: 0, sf: 0, sh: 0 };
     });
     pitchers.forEach(function (p) {
       pitching[p.id] = { outs: 0, k: 0, bb: 0, h: 0, r: 0, er: 0 };
@@ -112,6 +112,37 @@
     state.bases = [false, false, false];
     playIds = [];
   }
+
+    // Sacrificios: el out cuenta, pero no es turno oficial.
+  // allAdvance = true (toque): todos avanzan una base; false (fly): solo anota el de 3ra.
+  function sacrificeAdvance(allAdvance) {
+    var b = state.bases;
+    var runs = b[2] ? 1 : 0;
+    var nb = [false, false, false];
+    if (allAdvance) {
+      if (b[1]) nb[2] = true;
+      if (b[0]) nb[1] = true;
+    } else {
+      nb[0] = b[0];
+      nb[1] = b[1];
+    }
+    state.bases = nb;
+    return runs;
+  }
+
+  function sacrificeError(result) {
+    var b = state.bases;
+    if (result === "SF") {
+      if (!b[2]) return "El fly de sacrificio necesita un corredor en 3ra";
+      if (state.outs >= 2) return "Con 2 outs no cuenta como sacrificio: usa Out";
+    }
+    if (result === "SH") {
+      if (!(b[0] || b[1] || b[2])) return "El toque de sacrificio necesita corredores en base";
+      if (state.outs >= 2) return "Con 2 outs no cuenta como sacrificio: usa Out";
+    }
+    return null;
+  }
+
 
   // Aplica una jugada al estado local (sin tocar el servidor)
   function applyResult(result) {
@@ -128,6 +159,8 @@
     else if (result === "E") { s.ab++; runs = walkAdvance(); }
     else if (result === "K") { s.ab++; s.k++; state.outs++; outsMade = 1; }
     else if (result === "OUT") { s.ab++; state.outs++; outsMade = 1; }
+    else if (result === "SF") { s.sf++; state.outs++; outsMade = 1; runs = sacrificeAdvance(false); }
+    else if (result === "SH") { s.sh++; state.outs++; outsMade = 1; runs = sacrificeAdvance(true); }
 
     if (runs > 0) { s.rbi += runs; state.ourScore += runs; }
     state.batterIndex = (state.batterIndex + 1) % roster.length;
@@ -145,6 +178,8 @@
   function recordResult(result) {
     if (!gameId || roster.length === 0) { toast("Aún no hay conexión con el servidor"); return; }
     if (readOnly) { toast("Juego finalizado: solo lectura"); return; }
+    var err = sacrificeError(result);
+    if (err) { toast(err); return; }
     var info = applyResult(result);
     toast(info.inningEnded
       ? "Fin de la entrada — pasa a la entrada " + state.inning

@@ -2,7 +2,7 @@
   // [campo, encabezado, formato]
   var BAT_COLS = [
     ["name", "Jugador"], ["G", "G"], ["AB", "AB"], ["H", "H"], ["B2", "2B"], ["B3", "3B"],
-    ["HR", "HR"], ["RBI", "CI"], ["BB", "BB"], ["K", "K"], ["SB", "SB"],
+    ["HR", "HR"], ["RBI", "CI"], ["BB", "BB"], ["K", "K"], ["SB", "SB"], ["SF", "SF"], ["SH", "SH"],
     ["AVG", "AVG", "rate"], ["OBP", "OBP", "rate"], ["SLG", "SLG", "rate"], ["OPS", "OPS", "rate"]
   ];
   var PIT_COLS = [
@@ -11,7 +11,7 @@
   ];
   var BAT_LOG_COLS = [
     ["label", "Juego"], ["AB", "AB"], ["H", "H"], ["B2", "2B"], ["B3", "3B"], ["HR", "HR"],
-    ["RBI", "CI"], ["BB", "BB"], ["K", "K"], ["AVG", "AVG", "rate"]
+    ["RBI", "CI"], ["BB", "BB"], ["K", "K"], ["SF", "SF"], ["AVG", "AVG", "rate"]
   ];
   var PIT_LOG_COLS = [
     ["label", "Juego"], ["IP", "IP"], ["K", "K"], ["BB", "BB"], ["H", "H"],

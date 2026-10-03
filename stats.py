@@ -5,7 +5,7 @@ import models
 
 HITS = {"1B", "2B", "3B", "HR"}
 # No cuentan como turno oficial (AB): BB, HBP, SB y sacrificios
-NO_AB = {"BB", "HBP", "SB", "SF"}
+NO_AB = {"BB", "HBP", "SB", "SF", "SH"}
 
 INNINGS_POR_JUEGO = 7   # softball = 7, béisbol = 9 (para calcular la ERA)
 
@@ -15,7 +15,7 @@ def _tasa(num, den):
 
 def _bateo_vacio():
     return dict(PA=0, AB=0, H=0, B1=0, B2=0, B3=0, HR=0, BB=0, K=0,
-                SB=0, E=0, RBI=0)
+                SB=0, E=0, RBI=0, SF =0, SH=0)
 
 
 def _pitcheo_vacio():
@@ -50,7 +50,7 @@ def calcular(db: Session, game_id: Optional[int] = None, season_id: Optional[int
         if r in HITS:
             b["H"] += 1
             b["HR" if r == "HR" else "B" + r[0]] += 1
-        if r in ("BB", "K", "SB", "E"):
+        if r in ("BB", "K", "SB", "E", "SF", "SH"):
             b[r] += 1
         b["RBI"] += p.rbi
 
@@ -72,7 +72,7 @@ def calcular(db: Session, game_id: Optional[int] = None, season_id: Optional[int
     lista_bateo = []
     for pid, b in bateo.items():
         tb = b["B1"] + 2 * b["B2"] + 3 * b["B3"] + 4 * b["HR"]
-        obp = _tasa(b["H"] + b["BB"], b["AB"] + b["BB"])
+        obp = _tasa(b["H"] + b["BB"], b["AB"] + b["BB"] + b["SF"])
         slg = _tasa(tb, b["AB"])
         lista_bateo.append({
             "player_id": pid, "name": nombres.get(pid, "?"),
