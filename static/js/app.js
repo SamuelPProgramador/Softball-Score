@@ -46,8 +46,10 @@
   }
 
   function currentBatter() { return roster[state.batterIndex]; }
-
   var lastPlayCtx = null;   // contexto de la última jugada (para ajustarla)
+  var rosterOriginal = [];  // orden al bate con el que empezó el juego
+  var seen = [];            // todos los que han bateado o corrido (original + sustitutos)
+  var replacedIds = {};     // jugadores que ya salieron por un emergente
 
   function nameOf(id) {
     var p = roster.find(function (x) { return x.id === id; }) ||
@@ -136,6 +138,9 @@
   }
 
   function resetLocal() {
+    roster = rosterOriginal.slice();
+    seen = roster.slice();
+    replacedIds = {};
     stats = {};
     pitching = {};
     roster.forEach(function (p) {
@@ -244,6 +249,7 @@
     if (readOnly) { toast("Juego finalizado: solo lectura"); return; }
     var ctx = lastPlayCtx;
     if (!ctx || !ctx.playId) { toast("Aún no hay una jugada para ajustar"); return; }
+    if (ctx.isEvent) { toast("Para corregir un robo o un cambio usa Deshacer"); return; }
 
     var rows = [];
     for (var i = 2; i >= 0; i--) {
@@ -346,6 +352,192 @@
       });
     });
   }
+    // ---------- Robos de base y corredor emergente ----------
+  function blankStats() {
+    return { ab: 0, h: 0, "1b": 0, "2b": 0, "3b": 0, hr: 0, bb: 0, k: 0, rbi: 0, r: 0, sf: 0, sh: 0 };
+  }
+
+  // El emergente toma el lugar del corredor en el orden al bate
+  function substitute(oldId, newId) {
+    var idx = roster.findIndex(function (x) { return x.id === oldId; });
+    var np = pitchers.find(function (x) { return x.id === newId; });
+    if (idx < 0 || !np) return;
+    replacedIds[oldId] = true;
+    roster[idx] = np;
+    seen.push(np);
+    if (!stats[newId]) stats[newId] = blankStats();
+  }
+
+  // Jugadas que no son turno al bate: SB, CS y PR (emergente). No mueven el orden al bate.
+  function applyEvent(kind, moves) {
+    var inning = state.inning;
+    var outsBefore = state.outs;
+    var basesBefore = state.bases.slice();
+    if (kind === "PR") substitute(moves[0].r, moves[0].p);
+
+    var res = applyMoves(moves);
+    state.ourScore += res.runs;
+
+    var inningEnded = false;
+    if (state.outs >= 3) {
+      state.outs = 0;
+      state.bases = [null, null, null];
+      state.inning++;
+      inningEnded = true;
+    }
+
+    lastPlayCtx = { playId: null, isEvent: true, result: kind, batterId: moves[0].p,
+                    bases: basesBefore, outs: outsBefore, moves: moves };
+    return { runner: moves[0].p, inning: inning, runs: res.runs, outsMade: res.outs,
+             inningEnded: inningEnded, moves: moves };
+  }
+
+  function sendEvent(kind, moves, message) {
+    var info = applyEvent(kind, moves);
+    var ctx = lastPlayCtx;
+    toast(info.inningEnded
+      ? "Fin de la entrada — pasa a la entrada " + state.inning
+      : message);
+    render();
+    enqueue(async function () {
+      var saved = await api("POST", "/api/games/" + gameId + "/plays", {
+        inning: info.inning,
+        batter_id: info.runner,
+        result: kind,
+        rbi: 0,
+        outs_made: info.outsMade,
+        runs_scored: info.runs,
+        moves: JSON.stringify(info.moves)
+      });
+      playIds.push(saved.id);
+      ctx.playId = saved.id;
+    });
+  }
+
+  var STEAL_TO = ["", "2da", "3ra", "home"];
+
+  function steal(base, ok) {
+    if (readOnly) { toast("Juego finalizado: solo lectura"); return; }
+    var id = state.bases[base - 1];
+    if (id === null) return;
+    var name = nameOf(id);
+    if (ok) {
+      if (base < 3 && state.bases[base] !== null) {
+        toast("La siguiente base está ocupada");
+        return;
+      }
+      sendEvent("SB", [{ p: id, f: base, t: base + 1 }],
+                name + " robó " + STEAL_TO[base]);
+    } else {
+      sendEvent("CS", [{ p: id, f: base, t: 0 }],
+                name + " fue out en el robo");
+    }
+  }
+
+  function openPinchRunner(base) {
+    if (readOnly) { toast("Juego finalizado: solo lectura"); return; }
+    var oldId = state.bases[base - 1];
+    if (oldId === null) return;
+    var candidates = pitchers.filter(function (p) {
+      return !roster.some(function (r) { return r.id === p.id; }) && !replacedIds[p.id];
+    });
+    if (candidates.length === 0) { toast("No hay jugadores disponibles en la banca"); return; }
+
+    var back = document.createElement("div");
+    back.className = "modal-backdrop";
+    var box = document.createElement("div");
+    box.className = "modal";
+
+    var title = document.createElement("div");
+    title.className = "modal-title";
+    title.textContent = "Corredor emergente";
+    var sub = document.createElement("div");
+    sub.className = "modal-sub";
+    sub.textContent = "Entra por " + nameOf(oldId) + " (en " + BASE_LABEL[base] +
+                      "). Ocupará su lugar en el orden al bate.";
+    var sel = document.createElement("select");
+    sel.className = "pitcher-select";
+    candidates.forEach(function (p) {
+      var o = document.createElement("option");
+      o.value = p.id;
+      o.textContent = "#" + p.num + " " + p.name;
+      sel.appendChild(o);
+    });
+
+    var actions = document.createElement("div");
+    actions.className = "form-actions";
+    var ok = document.createElement("button");
+    ok.className = "btn";
+    ok.type = "button";
+    ok.textContent = "Aceptar";
+    var cancel = document.createElement("button");
+    cancel.className = "btn secondary";
+    cancel.type = "button";
+    cancel.textContent = "Cancelar";
+    actions.appendChild(ok);
+    actions.appendChild(cancel);
+
+    box.appendChild(title);
+    box.appendChild(sub);
+    box.appendChild(sel);
+    box.appendChild(actions);
+    back.appendChild(box);
+    document.body.appendChild(back);
+
+    function close() { document.body.removeChild(back); }
+    cancel.addEventListener("click", close);
+    back.addEventListener("click", function (e) { if (e.target === back) close(); });
+    ok.addEventListener("click", function () {
+      var newId = parseInt(sel.value, 10);
+      var msg = nameOf(newId) + " entra de corredor por " + nameOf(oldId);
+      close();
+      sendEvent("PR", [{ p: newId, f: base, t: base, r: oldId }], msg);
+    });
+  }
+
+  function renderRunners() {
+    var box = document.getElementById("runnersList");
+    box.innerHTML = "";
+    var any = false;
+    for (var i = 2; i >= 0; i--) {
+      if (state.bases[i] === null) continue;
+      any = true;
+      (function (base) {
+        var row = document.createElement("div");
+        row.className = "lineup-row";
+
+        var lab = document.createElement("span");
+        lab.className = "runner-base";
+        lab.textContent = BASE_LABEL[base];
+        var nm = document.createElement("span");
+        nm.className = "lineup-name";
+        nm.textContent = nameOf(state.bases[base - 1]);
+        row.appendChild(lab);
+        row.appendChild(nm);
+
+        if (!readOnly) {
+          [["Robo", false, function () { steal(base, true); }],
+           ["Out robo", true, function () { steal(base, false); }],
+           ["Emergente", false, function () { openPinchRunner(base); }]
+          ].forEach(function (a) {
+            var b = document.createElement("button");
+            b.className = "btn-link" + (a[1] ? " danger" : "");
+            b.type = "button";
+            b.textContent = a[0];
+            b.addEventListener("click", a[2]);
+            row.appendChild(b);
+          });
+        }
+        box.appendChild(row);
+      })(i + 1);
+    }
+    if (!any) {
+      var empty = document.createElement("div");
+      empty.className = "lineup-row";
+      empty.textContent = "Sin corredores en base.";
+      box.appendChild(empty);
+    }
+  }
 
   // Carga el juego: reconstruye bases, outs, marcador y estadísticas repitiendo las jugadas
   async function loadGame() {
@@ -354,7 +546,11 @@
     plays.forEach(function (p) {
       var mv = null;
       if (p.moves) { try { mv = JSON.parse(p.moves); } catch (e) { mv = null; } }
-      applyResult(p.result, mv);
+      if (p.result === "SB" || p.result === "CS" || p.result === "PR") {
+        if (mv) applyEvent(p.result, mv);
+      } else {
+        applyResult(p.result, mv);
+      }
       playIds.push(p.id);
       if (lastPlayCtx) lastPlayCtx.playId = p.id;
     });
@@ -401,9 +597,13 @@
         };
       });
 
+      rosterOriginal = roster.slice();
       var players = await api("GET", "/api/players");
       pitchers = players.map(function (p) {
-        return { id: p.id, num: p.number == null ? "–" : p.number, name: p.name, pos: p.position || "" };
+        return {
+          id: p.id, num: p.number == null ? "–" : p.number, name: p.name, pos: p.position || "",
+          photo: p.photo_v ? "/api/players/" + p.id + "/photo?v=" + p.photo_v : null
+        };
       });
       roster.forEach(function (r) {
         if (!pitchers.some(function (p) { return p.id === r.id; })) pitchers.push(r);
@@ -503,7 +703,7 @@
   function renderResumen() {
     var body = document.getElementById("resumenBody");
     body.innerHTML = "";
-    roster.forEach(function (p) {
+    seen.forEach(function (p) {
       var s = stats[p.id];
       var tr = document.createElement("tr");
       tr.innerHTML =
@@ -529,6 +729,7 @@
     renderScoreboard();
     renderBatter();
     renderLineup();
+    renderRunners();
     renderPitching();
     renderResumen();
   }

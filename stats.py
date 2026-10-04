@@ -6,7 +6,7 @@ import json
 
 HITS = {"1B", "2B", "3B", "HR"}
 # No cuentan como turno oficial (AB): BB, HBP, SB y sacrificios
-NO_AB = {"BB", "HBP", "SB", "SF", "SH"}
+NO_AB = {"BB", "HBP", "SB", "SF", "SH", "CS", "PR"}
 
 INNINGS_POR_JUEGO = 7   # softball = 7, béisbol = 9 (para calcular la ERA)
 
@@ -16,7 +16,7 @@ def _tasa(num, den):
 
 def _bateo_vacio():
     return dict(PA=0, AB=0, H=0, B1=0, B2=0, B3=0, HR=0, BB=0, K=0,
-                SB=0, E=0, RBI=0, SF=0, SH=0, R=0)
+                SB=0, E=0, RBI=0, SF=0, SH=0, R=0, CS=0)
 
 
 def _pitcheo_vacio():
@@ -44,14 +44,14 @@ def calcular(db: Session, game_id: Optional[int] = None, season_id: Optional[int
         r = p.result
         b = bateo[p.batter_id]
         juegos_bat[p.batter_id].add(p.game_id)
-        if r != "SB":
+        if r not in ("SB", "CS", "PR"):
             b["PA"] += 1
         if r not in NO_AB:
             b["AB"] += 1
         if r in HITS:
             b["H"] += 1
             b["HR" if r == "HR" else "B" + r[0]] += 1
-        if r in ("BB", "K", "SB", "E", "SF", "SH"):
+        if r in ("BB", "K", "SB", "E", "SF", "SH", "CS"):
             b[r] += 1
         b["RBI"] += p.rbi
         if p.moves:

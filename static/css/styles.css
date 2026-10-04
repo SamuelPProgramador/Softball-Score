@@ -580,3 +580,6 @@ tr.total td { font-weight: 700; border-top: 1px solid var(--line-strong); }
 .modal-sub { font-size: 12px; color: var(--chalk-dim); margin-bottom: 12px; }
 .modal-row { display: grid; grid-template-columns: 1fr 140px; gap: 8px; align-items: center; margin-bottom: 8px; font-size: 14px; color: var(--chalk); }
 .modal-error { color: #E58B80; font-size: 12px; min-height: 16px; margin: 4px 0; }
+
+/* Corredores en base */
+.runner-base { min-width: 34px; font-family: var(--font-display); color: var(--amber); }

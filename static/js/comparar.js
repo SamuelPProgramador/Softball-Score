@@ -16,6 +16,7 @@
     { key: "BB",  label: "Boletos (BB)", better: "high" },
     { key: "K",   label: "Ponches (K)", better: "low" },
     { key: "SB",  label: "Bases robadas (SB)", better: "high" },
+    { key: "CS",  label: "Out robando (CS)", better: "low" },
     { key: "SF",  label: "Flies de sacrificio (SF)", better: "high" },
     { key: "SH",  label: "Toques de sacrificio (SH)", better: "high" },
     { key: "AVG", label: "AVG", kind: "rate", better: "high", needs: "AB" },
