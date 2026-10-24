@@ -583,3 +583,6 @@ tr.total td { font-weight: 700; border-top: 1px solid var(--line-strong); }
 
 /* Corredores en base */
 .runner-base { min-width: 34px; font-family: var(--font-display); color: var(--amber); }
+
+/* Torneos */
+tr.mine td { color: var(--amber); font-weight: 700; }

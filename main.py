@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from database import Base, engine, get_db
 import models, schemas
 import stats
@@ -507,7 +507,226 @@ def guardar_equipo(data: schemas.TeamIn, db: Session = Depends(get_db)):
     db.refresh(t)
     return t
 
+# ---------- TORNEOS ----------
+def _torneo(db: Session, tid: int):
+    t = db.get(models.Tournament, tid)
+    if not t:
+        raise HTTPException(404, "Torneo no encontrado")
+    return t
 
+
+def _posiciones(equipos, juegos):
+    tabla = {e.id: {"team_id": e.id, "name": e.name, "is_mine": e.is_mine,
+                    "played": 0, "wins": 0, "losses": 0, "ties": 0, "rf": 0, "ra": 0}
+             for e in equipos}
+    for g in juegos:
+        if g.status != "finalizado":
+            continue
+        for team_id, a_favor, en_contra in (
+                (g.home_team_id, g.home_score, g.away_score),
+                (g.away_team_id, g.away_score, g.home_score)):
+            fila = tabla.get(team_id)
+            if not fila:
+                continue
+            fila["played"] += 1
+            fila["rf"] += a_favor
+            fila["ra"] += en_contra
+            if a_favor > en_contra:
+                fila["wins"] += 1
+            elif a_favor < en_contra:
+                fila["losses"] += 1
+            else:
+                fila["ties"] += 1
+    filas = list(tabla.values())
+    for f in filas:
+        f["diff"] = f["rf"] - f["ra"]
+        f["pct"] = round((f["wins"] + 0.5 * f["ties"]) / f["played"], 3) if f["played"] else 0
+    # Orden: porcentaje, diferencial de carreras, carreras a favor, nombre
+    filas.sort(key=lambda f: (-f["pct"], -f["diff"], -f["rf"], f["name"].lower()))
+    for i, f in enumerate(filas, start=1):
+        f["rank"] = i
+    return filas
+
+
+def _validar_partido(db: Session, tid: int, data):
+    if data.home_team_id == data.away_team_id:
+        raise HTTPException(400, "Un equipo no puede jugar contra sí mismo")
+    for team_id in (data.home_team_id, data.away_team_id):
+        existe = db.query(models.TournamentTeam).filter_by(
+            tournament_id=tid, team_id=team_id).first()
+        if not existe:
+            raise HTTPException(400, "Uno de los equipos no está en el torneo")
+
+
+@app.get("/api/teams")
+def listar_equipos(db: Session = Depends(get_db)):
+    return [{"id": e.id, "name": e.name, "is_mine": e.is_mine}
+            for e in db.query(models.Team).order_by(models.Team.name).all()]
+
+
+@app.get("/api/tournaments")
+def listar_torneos(db: Session = Depends(get_db)):
+    salida = []
+    for t in db.query(models.Tournament).order_by(models.Tournament.id.desc()).all():
+        juegos = db.query(models.TournamentGame).filter_by(tournament_id=t.id).all()
+        salida.append({
+            "id": t.id, "name": t.name, "start_date": t.start_date,
+            "end_date": t.end_date, "location": t.location, "status": t.status,
+            "teams": db.query(models.TournamentTeam).filter_by(tournament_id=t.id).count(),
+            "games": len(juegos),
+            "finished": sum(1 for g in juegos if g.status == "finalizado"),
+        })
+    return salida
+
+
+@app.post("/api/tournaments")
+def crear_torneo(data: schemas.TournamentIn, db: Session = Depends(get_db)):
+    nombre = data.name.strip()
+    if not nombre:
+        raise HTTPException(400, "Escribe el nombre del torneo")
+    t = models.Tournament(name=nombre, start_date=data.start_date, end_date=data.end_date,
+                          location=(data.location or "").strip() or None)
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+    return t
+
+
+@app.put("/api/tournaments/{tid}")
+def editar_torneo(tid: int, data: schemas.TournamentIn, db: Session = Depends(get_db)):
+    t = _torneo(db, tid)
+    nombre = data.name.strip()
+    if not nombre:
+        raise HTTPException(400, "Escribe el nombre del torneo")
+    if data.status not in ("en_curso", "finalizado"):
+        raise HTTPException(400, "Estado no válido")
+    t.name, t.start_date, t.end_date = nombre, data.start_date, data.end_date
+    t.location = (data.location or "").strip() or None
+    t.status = data.status
+    db.commit()
+    return t
+
+
+@app.delete("/api/tournaments/{tid}")
+def borrar_torneo(tid: int, db: Session = Depends(get_db)):
+    _torneo(db, tid)
+    db.query(models.TournamentGame).filter_by(tournament_id=tid).delete()
+    db.query(models.TournamentTeam).filter_by(tournament_id=tid).delete()
+    db.query(models.Tournament).filter_by(id=tid).delete()
+    db.commit()
+    return {"ok": True}
+
+
+@app.get("/api/tournaments/{tid}")
+def ver_torneo(tid: int, db: Session = Depends(get_db)):
+    t = _torneo(db, tid)
+    equipos = (db.query(models.Team)
+                 .join(models.TournamentTeam, models.TournamentTeam.team_id == models.Team.id)
+                 .filter(models.TournamentTeam.tournament_id == tid)
+                 .order_by(models.Team.name).all())
+    juegos = (db.query(models.TournamentGame).filter_by(tournament_id=tid)
+                .order_by(models.TournamentGame.date, models.TournamentGame.time,
+                          models.TournamentGame.id).all())
+    nombres = {e.id: e.name for e in equipos}
+    return {
+        "tournament": t,
+        "teams": [{"id": e.id, "name": e.name, "is_mine": e.is_mine} for e in equipos],
+        "games": [{
+            "id": g.id, "date": g.date, "time": g.time, "location": g.location,
+            "phase": g.phase, "status": g.status,
+            "home_team_id": g.home_team_id, "away_team_id": g.away_team_id,
+            "home_name": nombres.get(g.home_team_id, "?"),
+            "away_name": nombres.get(g.away_team_id, "?"),
+            "home_score": g.home_score, "away_score": g.away_score,
+        } for g in juegos],
+        "standings": _posiciones(equipos, juegos),
+    }
+
+
+@app.post("/api/tournaments/{tid}/teams")
+def agregar_equipo_torneo(tid: int, data: schemas.TournamentTeamIn,
+                          db: Session = Depends(get_db)):
+    _torneo(db, tid)
+    nombre = data.name.strip()
+    if not nombre:
+        raise HTTPException(400, "Escribe el nombre del equipo")
+    if data.is_mine:
+        equipo = db.query(models.Team).filter_by(is_mine=True).first()
+        if equipo:
+            equipo.name = nombre
+    else:
+        equipo = db.query(models.Team).filter(
+            func.lower(models.Team.name) == nombre.lower()).first()
+    if not equipo:
+        equipo = models.Team(name=nombre, is_mine=data.is_mine)
+        db.add(equipo)
+        db.flush()
+    ya = db.query(models.TournamentTeam).filter_by(
+        tournament_id=tid, team_id=equipo.id).first()
+    if ya:
+        raise HTTPException(400, "Ese equipo ya está en el torneo")
+    db.add(models.TournamentTeam(tournament_id=tid, team_id=equipo.id))
+    db.commit()
+    return {"id": equipo.id, "name": equipo.name, "is_mine": equipo.is_mine}
+
+
+@app.delete("/api/tournaments/{tid}/teams/{team_id}")
+def quitar_equipo_torneo(tid: int, team_id: int, db: Session = Depends(get_db)):
+    con_juegos = db.query(models.TournamentGame).filter(
+        models.TournamentGame.tournament_id == tid,
+        or_(models.TournamentGame.home_team_id == team_id,
+            models.TournamentGame.away_team_id == team_id)).count()
+    if con_juegos:
+        raise HTTPException(400, "Ese equipo tiene juegos en el torneo: bórralos primero")
+    db.query(models.TournamentTeam).filter_by(tournament_id=tid, team_id=team_id).delete()
+    db.commit()
+    return {"ok": True}
+
+
+@app.post("/api/tournaments/{tid}/games")
+def crear_juego_torneo(tid: int, data: schemas.TournamentGameIn,
+                       db: Session = Depends(get_db)):
+    _torneo(db, tid)
+    _validar_partido(db, tid, data)
+    g = models.TournamentGame(
+        tournament_id=tid, home_team_id=data.home_team_id, away_team_id=data.away_team_id,
+        date=data.date, time=data.time or None,
+        location=(data.location or "").strip() or None,
+        phase=(data.phase or "").strip() or None)
+    db.add(g)
+    db.commit()
+    db.refresh(g)
+    return {"id": g.id}
+
+
+@app.post("/api/tournament-games/{gid}/result")
+def resultado_juego_torneo(gid: int, data: schemas.TournamentResultIn,
+                           db: Session = Depends(get_db)):
+    g = db.get(models.TournamentGame, gid)
+    if not g:
+        raise HTTPException(404, "Juego no encontrado")
+    if data.home_score < 0 or data.away_score < 0:
+        raise HTTPException(400, "Las carreras no pueden ser negativas")
+    g.home_score, g.away_score, g.status = data.home_score, data.away_score, "finalizado"
+    db.commit()
+    return {"ok": True}
+
+
+@app.post("/api/tournament-games/{gid}/reopen")
+def reabrir_juego_torneo(gid: int, db: Session = Depends(get_db)):
+    g = db.get(models.TournamentGame, gid)
+    if not g:
+        raise HTTPException(404, "Juego no encontrado")
+    g.home_score, g.away_score, g.status = None, None, "programado"
+    db.commit()
+    return {"ok": True}
+
+
+@app.delete("/api/tournament-games/{gid}")
+def borrar_juego_torneo(gid: int, db: Session = Depends(get_db)):
+    db.query(models.TournamentGame).filter_by(id=gid).delete()
+    db.commit()
+    return {"ok": True}
 # ---------- FRONTEND ----------
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

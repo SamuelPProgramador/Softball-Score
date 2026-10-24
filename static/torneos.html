@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Torneos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body data-page="torneos">
+<div class="wrap wide">
+  <div id="mainnav"></div>
+
+  <div class="form-card">
+    <div class="section-title" style="margin-top:0">Nuevo torneo</div>
+    <div class="form-grid">
+      <div class="full">
+        <label class="field-label" for="fName">Nombre</label>
+        <input class="input" id="fName" type="text" maxlength="60" placeholder="Ej: Copa Aniversario">
+      </div>
+      <div>
+        <label class="field-label" for="fStart">Inicio</label>
+        <input class="input" id="fStart" type="date">
+      </div>
+      <div>
+        <label class="field-label" for="fEnd">Fin</label>
+        <input class="input" id="fEnd" type="date">
+      </div>
+      <div class="full">
+        <label class="field-label" for="fPlace">Sede (opcional)</label>
+        <input class="input" id="fPlace" type="text" maxlength="60" placeholder="Estadio o complejo">
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" id="createBtn" type="button">Crear torneo</button>
+    </div>
+  </div>
+
+  <div class="section-title">Torneos</div>
+  <div class="lineup-card" id="tournamentList"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="/static/js/nav.js"></script>
+<script src="/static/js/torneos.js"></script>
+</body>
+</html>

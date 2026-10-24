@@ -58,3 +58,28 @@ class PlayAdjustIn(BaseModel):
     runs_scored: int
     rbi: int
 
+class TournamentIn(BaseModel):
+    name: str
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    location: Optional[str] = None
+    status: str = "en_curso"
+
+
+class TournamentTeamIn(BaseModel):
+    name: str
+    is_mine: bool = False
+
+
+class TournamentGameIn(BaseModel):
+    home_team_id: int
+    away_team_id: int
+    date: date
+    time: Optional[str] = None
+    location: Optional[str] = None
+    phase: Optional[str] = None
+
+
+class TournamentResultIn(BaseModel):
+    home_score: int
+    away_score: int

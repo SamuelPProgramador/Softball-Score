@@ -82,3 +82,45 @@ class TeamSettings(Base):
     name = Column(String, nullable=False, default="Mi Equipo")
     color = Column(String, default="#E0AE45")
     logo = Column(Text)   # imagen reducida, guardada como data URL
+
+
+class Team(Base):
+    """Equipo (el mío o un rival). Se reutiliza entre torneos."""
+    __tablename__ = "teams"
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    is_mine = Column(Boolean, default=False)
+
+
+class Tournament(Base):
+    __tablename__ = "tournaments"
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+    start_date = Column(Date)
+    end_date = Column(Date)
+    location = Column(String)
+    status = Column(String, default="en_curso")   # en_curso / finalizado
+
+
+class TournamentTeam(Base):
+    __tablename__ = "tournament_teams"
+    __table_args__ = (UniqueConstraint("tournament_id", "team_id"),)
+    id = Column(Integer, primary_key=True)
+    tournament_id = Column(Integer, ForeignKey("tournaments.id"), nullable=False)
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
+
+
+class TournamentGame(Base):
+    __tablename__ = "tournament_games"
+    id = Column(Integer, primary_key=True)
+    tournament_id = Column(Integer, ForeignKey("tournaments.id"), nullable=False)
+    home_team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
+    away_team_id = Column(Integer, ForeignKey("teams.id"), nullable=False)
+    date = Column(Date, nullable=False)
+    time = Column(String)
+    location = Column(String)
+    phase = Column(String)                  # ej. "Jornada 1", "Semifinal"
+    home_score = Column(Integer)
+    away_score = Column(Integer)
+    status = Column(String, default="programado")   # programado / finalizado
+    game_id = Column(Integer, ForeignKey("games.id"))   # juego en vivo de mi equipo (T2)

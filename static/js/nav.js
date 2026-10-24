@@ -3,6 +3,7 @@
     { key: "dashboard",    label: "Dashboard",    href: "/static/dashboard.html" },
     { key: "jugadores",    label: "Jugadores",    href: "/static/jugadores.html" },
     { key: "juegos",       label: "Juegos",       href: "/static/juegos.html" },
+    { key: "torneos",      label: "Torneos",      href: "/static/torneos.html" },
     { key: "estadisticas", label: "Estadísticas", href: "/static/estadisticas.html" },
     { key: "comparar",     label: "Comparar",     href: "/static/comparar.html" },
     { key: "temporadas",   label: "Temporadas",   href: "/static/temporadas.html" },
