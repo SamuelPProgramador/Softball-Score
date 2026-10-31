@@ -87,6 +87,14 @@
       mv.push({ p: batterId, f: 0, t: 0 });
     }
     else if (result === "SH") { advance(1); mv.push({ p: batterId, f: 0, t: 0 }); }
+    else if (result === "DP") {
+      mv.push({ p: b[0], f: 1, t: 0 });             // out al corredor de 1ra
+      if (state.outs === 0) {                        // con 0 outs la entrada sigue
+        if (b[2] !== null) mv.push({ p: b[2], f: 3, t: 4 });
+        if (b[1] !== null) mv.push({ p: b[1], f: 2, t: 3 });
+      }
+      mv.push({ p: batterId, f: 0, t: 0 });          // out al bateador
+    }
     else { mv.push({ p: batterId, f: 0, t: 0 }); }   // K y OUT
     return mv;
   }
@@ -106,6 +114,10 @@
   }
 
   function sacrificeError(result) {
+    if (result === "DP") {
+      if (!state.bases[0]) return "El doble play necesita un corredor en 1ra";
+      if (state.outs >= 2) return "Con 2 outs no hay doble play: usa Out";
+    }
     var b = state.bases;
     if (result === "SF") {
       if (!b[2]) return "El fly de sacrificio necesita un corredor en 3ra";
@@ -179,9 +191,13 @@
     else if (result === "OUT") { s.ab++; }
     else if (result === "SF") { s.sf++; }
     else if (result === "SH") { s.sh++; }
+    else if (result === "DP") { s.ab++; }
 
     var res = applyMoves(moves);
-    if (res.runs > 0) { s.rbi += res.runs; state.ourScore += res.runs; }
+    if (res.runs > 0) {
+      if (result !== "DP") s.rbi += res.runs;   // en un doble play no se acreditan impulsadas
+      state.ourScore += res.runs;
+    }
     state.batterIndex = (state.batterIndex + 1) % roster.length;
 
     var inningEnded = false;
@@ -215,7 +231,7 @@
         inning: info.inning,
         batter_id: info.batter.id,
         result: result,
-        rbi: info.runs,
+        rbi: result === "DP" ? 0 : info.runs,
         outs_made: info.outsMade,
         runs_scored: info.runs,
         moves: JSON.stringify(info.moves)
@@ -345,7 +361,7 @@
           moves: JSON.stringify(moves),
           outs_made: outsMade,
           runs_scored: runs,
-          rbi: runs
+          rbi: ctx.result === "DP" ? 0 : runs
         });
         await loadGame();
         toast("Corredores ajustados");

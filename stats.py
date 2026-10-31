@@ -16,7 +16,7 @@ def _tasa(num, den):
 
 def _bateo_vacio():
     return dict(PA=0, AB=0, H=0, B1=0, B2=0, B3=0, HR=0, BB=0, K=0,
-                SB=0, E=0, RBI=0, SF=0, SH=0, R=0, CS=0)
+                SB=0, E=0, RBI=0, SF=0, SH=0, R=0, CS=0, GDP=0)
 
 
 def _pitcheo_vacio():
@@ -53,6 +53,8 @@ def calcular(db: Session, game_id: Optional[int] = None, season_id: Optional[int
             b["HR" if r == "HR" else "B" + r[0]] += 1
         if r in ("BB", "K", "SB", "E", "SF", "SH", "CS"):
             b[r] += 1
+        if r == "DP":
+            b["GDP"] += 1
         b["RBI"] += p.rbi
         if p.moves:
             try:
