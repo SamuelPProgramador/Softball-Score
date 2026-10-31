@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, Response
+from fastapi import FastAPI, Depends, HTTPException, Response, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
@@ -10,6 +10,8 @@ from datetime import date
 from typing import Optional
 import re
 import base64
+import os
+import secrets
 import zlib
 import json
 
@@ -17,7 +19,22 @@ import json
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Softball Stats")
+# Contraseña única para el hosting de prueba (solo se activa si existe APP_PASSWORD)
+APP_PASSWORD = os.environ.get("APP_PASSWORD")
 
+if APP_PASSWORD:
+    @app.middleware("http")
+    async def proteger(request: Request, call_next):
+        auth = request.headers.get("authorization", "")
+        if auth.lower().startswith("basic "):
+            try:
+                _, _, clave = base64.b64decode(auth[6:]).decode().partition(":")
+            except Exception:
+                clave = ""
+            if secrets.compare_digest(clave.encode(), APP_PASSWORD.encode()):
+                return await call_next(request)
+        return Response(status_code=401,
+                        headers={"WWW-Authenticate": 'Basic realm="Softball"'})
 
 # ---------- JUGADORES ----------
 FOTO_RE = re.compile(r"^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$")
