@@ -87,7 +87,8 @@
     <div class="lineup-card" id="runnersList"></div>
     <div class="section-title">Alineación</div>
     <div class="lineup-card" id="lineupList"></div>
-    <button class="btn" id="finishBtn" type="button" style="width:100%;margin-top:14px">Finalizar juego</button>  </div>
+    <button class="btn" id="finishBtn" type="button" style="width:100%;margin-top:14px">Finalizar juego</button>
+    <a class="btn" id="destBtn" href="#" style="display:block;width:100%;margin-top:10px;text-align:center;box-sizing:border-box">Destacados para compartir</a>  </div>
 
   <!-- PITCHEO -->
   <div class="panel" id="panel-pitcheo">
@@ -139,5 +140,9 @@
 
 <script src="/static/js/nav.js"></script>
 <script src="/static/js/app.js"></script>
+<script>
+  document.getElementById("destBtn").href =
+    "/static/destacados.html?game=" + new URLSearchParams(location.search).get("game");
+</script>
 </body>
 </html>

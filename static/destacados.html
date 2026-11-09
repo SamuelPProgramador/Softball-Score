@@ -20,7 +20,7 @@
 </head>
 <body>
 <h1>Jugadores destacados</h1>
-<a id="back" href="/juegos.html">← Volver a juegos</a>
+<a id="back" href="/static/juegos.html">← Volver a juegos</a>
 <div id="msg">Cargando…</div>
 <div class="grid" id="grid"></div>
 
@@ -125,7 +125,7 @@ async function dibujar(x,idx,ctxInfo){
 async function main(){
   const msg=document.getElementById('msg'),grid=document.getElementById('grid');
   if(!gameId){msg.textContent='Falta el juego (?game=ID).';return;}
-  document.getElementById('back').href='/partido.html?id='+gameId;
+document.getElementById('back').href='/static/partido.html?game='+gameId;
   try{
     const [sheet,team]=await Promise.all([fetch('/api/games/'+gameId+'/sheet').then(r=>r.json()),fetch('/api/team').then(r=>r.json()).catch(()=>({}))]);
     const gm=sheet.game||sheet.juego||sheet;

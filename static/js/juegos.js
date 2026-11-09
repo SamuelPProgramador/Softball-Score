@@ -181,6 +181,10 @@
       var sheet = el("a", "btn-link", "Hoja");
       sheet.href = "/static/reportes.html?game=" + g.id;
       acts.appendChild(sheet);
+
+      var dest = el("a", "btn-link", "Destacados");
+      dest.href = "/static/destacados.html?game=" + g.id;
+      acts.appendChild(dest);
     }
 
     var edit = el("button", "btn-link", "Editar");

@@ -277,6 +277,10 @@ def registrar_jugada(game_id: int, data: schemas.PlayIn, db: Session = Depends(g
     return play
 
 
+@app.get("/destacados.html")
+def pagina_destacados():
+    return FileResponse("static/destacados.html")
+
 @app.delete("/api/plays/{play_id}")
 def deshacer_jugada(play_id: int, db: Session = Depends(get_db)):
     play = db.get(models.Play, play_id)
