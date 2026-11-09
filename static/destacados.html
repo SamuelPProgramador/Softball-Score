@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jugadores destacados</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  body{margin:0;background:#10201A;color:#F3F0E6;font-family:Inter,sans-serif;padding:16px}
+  h1{font-family:Oswald,sans-serif;font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:24px;margin:0 0 4px}
+  a{color:#E0AE45}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;margin-top:16px}
+  .item{background:#1B3A2C;border-radius:12px;padding:12px}
+  .item canvas{width:100%;height:auto;border-radius:8px;display:block}
+  .btns{display:flex;gap:8px;margin-top:10px}
+  button{flex:1;padding:12px;border:0;border-radius:8px;font:600 15px Inter,sans-serif;cursor:pointer;background:#E0AE45;color:#10201A}
+  button.sec{background:transparent;color:#F3F0E6;border:2px solid rgba(243,240,230,.3)}
+  #msg{color:#C7CDC5;margin-top:8px}
+</style>
+</head>
+<body>
+<h1>Jugadores destacados</h1>
+<a id="back" href="/juegos.html">← Volver a juegos</a>
+<div id="msg">Cargando…</div>
+<div class="grid" id="grid"></div>
+
+<script>
+(function(){
+const W=1080,H=1350, C={fd:'#10201A',f:'#1B3A2C',fl:'#244A38',fll:'#2E5C46',chalk:'#F3F0E6',dim:'#C7CDC5'};
+const gameId=new URLSearchParams(location.search).get('game');
+const n=v=>Number(v)||0;
+const pick=(o,...k)=>{for(const x of k){if(o&&o[x]!==undefined&&o[x]!==null&&o[x]!=='')return o[x];}return undefined;};
+
+/* ====== ADAPTADOR: si tus nombres de campo difieren, ajusta SOLO aquí ====== */
+function bat(r){return {id:pick(r,'player_id','id'),nombre:pick(r,'nombre','name','player')||'Jugador',num:pick(r,'numero','number','num'),pos:pick(r,'posicion','pos','position')||'',
+  AB:n(r.AB),H:n(r.H),B2:n(r.B2),B3:n(r.B3),HR:n(r.HR),RBI:n(r.RBI),R:n(r.R),BB:n(r.BB),K:n(r.K),SB:n(r.SB),AVG:r.AVG};}
+function pit(r){return {id:pick(r,'player_id','id'),nombre:pick(r,'nombre','name','player')||'Jugador',num:pick(r,'numero','number','num'),pos:'P',
+  IP:r.IP,K:n(r.K),BB:n(r.BB),H:n(r.H),R:n(r.R),ER:n(r.ER),ERA:r.ERA};}
+function ipNum(ip){const s=String(ip??0);const [a,b]=s.split('.');return n(a)+(n(b)/3);} // 6.1 = 6 y 1/3
+/* ======================================================================== */
+
+function elegir(sheet){
+  const out=new Map();
+  for(const r of (sheet.bateo||[]).map(bat)){
+    if(r.AB+r.BB===0)continue;
+    const s=r.H*2+r.B2+r.B3*2+r.HR*3+r.RBI*1.5+r.R+r.SB*.5+r.BB*.5-r.K*.3;
+    out.set(r.id,{tipo:'bat',s,r});
+  }
+  for(const r of (sheet.pitcheo||[]).map(pit)){
+    const ip=ipNum(r.IP); if(ip<=0)continue;
+    const s=ip*1.5+r.K-r.ER*2-r.H*.5-r.BB*.5;
+    const prev=out.get(r.id); if(!prev||s>prev.s)out.set(r.id,{tipo:'pit',s,r});
+  }
+  return [...out.values()].sort((a,b)=>b.s-a.s).slice(0,3);
+}
+function tiles(x){
+  const r=x.r;
+  if(x.tipo==='pit')return [[r.K,'Ponches'],[r.H,'Hits'],[r.BB,'Boletos'],[r.ER,'C. limpias']];
+  const c=[[r.HR,'Jonrón'],[r.B3,'Triple'],[r.B2,'Doble'],[r.RBI,'Impulsadas'],[r.R,'Anotadas'],[r.SB,'Base robada'],[r.BB,'Boleto']];
+  const t=c.filter(a=>a[0]>0).slice(0,4);
+  for(const a of [[r.RBI,'Impulsadas'],[r.R,'Anotadas'],[r.H,'Hits'],[r.K,'Ponches']]){ if(t.length>=4)break; if(!t.some(b=>b[1]===a[1]))t.push(a); }
+  return t;
+}
+function hero(x){
+  const r=x.r;
+  if(x.tipo==='pit')return [ (String(r.IP).includes('.')?Number(r.IP).toFixed(1):r.IP+'.0')+' IP','en el montículo'+(r.ERA!=null?' · ERA '+Number(r.ERA).toFixed(2):'')];
+  return [r.H+' de '+r.AB,'al bate'+(r.AVG!=null&&r.AB?' · AVG '+Number(r.AVG).toFixed(3).replace(/^0/,''):'')];
+}
+
+function loadImg(src){return new Promise(res=>{const i=new Image();i.crossOrigin='anonymous';i.onload=()=>res(i);i.onerror=()=>res(null);i.src=src;});}
+function txt(ctx,t,x,y,font,color,align='center',ls=0){ctx.font=font;ctx.fillStyle=color;ctx.textAlign=align;ctx.textBaseline='alphabetic';if('letterSpacing' in ctx)ctx.letterSpacing=ls+'px';ctx.fillText(t,x,y);if('letterSpacing' in ctx)ctx.letterSpacing='0px';}
+function rr(ctx,x,y,w,h,r){ctx.beginPath();ctx.roundRect?ctx.roundRect(x,y,w,h,r):ctx.rect(x,y,w,h);}
+
+async function dibujar(x,idx,ctxInfo){
+  const {team,accent,logo,rival,pf,pc,fecha}=ctxInfo;
+  const cv=document.createElement('canvas');cv.width=W;cv.height=H;const g=cv.getContext('2d');
+  // fondo
+  const bg=g.createRadialGradient(W/2,H*.3,0,W/2,H*.3,H*.8);bg.addColorStop(0,C.fll);bg.addColorStop(.46,C.f);bg.addColorStop(1,C.fd);g.fillStyle=bg;g.fillRect(0,0,W,H);
+  g.fillStyle='rgba(255,255,255,0.022)';for(let i=0;i<W;i+=180)g.fillRect(i,0,90,H);
+  g.save();g.translate(W/2,940);g.rotate(Math.PI/4);g.strokeStyle='rgba(243,240,230,0.07)';g.lineWidth=3;g.strokeRect(-470,-470,940,940);g.restore();
+  // encabezado
+  g.beginPath();g.arc(108,104,44,0,7);g.fillStyle=accent;g.fill();g.lineWidth=4;g.strokeStyle=C.chalk;g.stroke();
+  if(logo){g.save();g.beginPath();g.arc(108,104,40,0,7);g.clip();g.drawImage(logo,68,64,80,80);g.restore();}
+  else txt(g,team.slice(0,2).toUpperCase(),108,118,'700 38px Oswald',C.fd);
+  txt(g,team.toUpperCase(),174,102,'600 40px Oswald',C.chalk,'left',3);
+  txt(g,'SOFTBALL',174,135,'500 21px Inter',C.dim,'left',2.5);
+  const tag=idx===0?'JUGADOR DEL JUEGO':'DESTACADO #'+(idx+1);
+  g.font='600 30px Oswald';if('letterSpacing' in g)g.letterSpacing='3px';const tw=g.measureText(tag).width;if('letterSpacing' in g)g.letterSpacing='0px';
+  rr(g,W-64-tw-52,70,tw+52,69,8);
+  if(idx===0){g.fillStyle=accent;g.fill();}else{g.lineWidth=3;g.strokeStyle=accent;g.stroke();}
+  txt(g,tag,W-64-26,115,'600 30px Oswald',idx===0?C.fd:accent,'right',3);
+  // número grande
+  if(x.r.num!=null){g.font='700 520px Oswald';g.textAlign='center';g.lineWidth=3;g.strokeStyle='rgba(243,240,230,0.14)';g.strokeText(String(x.r.num),W/2,520);}
+  // foto
+  const cx=W/2,cy=386,R=180;
+  g.save();g.beginPath();g.arc(cx,cy,R,0,7);g.clip();
+  const av=g.createRadialGradient(cx,cy-40,0,cx,cy,R);av.addColorStop(0,C.fll);av.addColorStop(.7,C.fl);g.fillStyle=av;g.fillRect(cx-R,cy-R,2*R,2*R);
+  const foto=x.r.id!=null?await loadImg('/api/players/'+x.r.id+'/photo'):null;
+  if(foto){const s=Math.max(2*R/foto.width,2*R/foto.height);g.drawImage(foto,cx-foto.width*s/2,cy-foto.height*s/2,foto.width*s,foto.height*s);}
+  else{g.fillStyle='rgba(243,240,230,0.30)';g.beginPath();g.arc(cx,cy-14,48,0,7);g.fill();g.beginPath();g.ellipse(cx,cy+R,108,110,0,Math.PI,0);g.fill();}
+  g.restore();g.beginPath();g.arc(cx,cy,R,0,7);g.lineWidth=12;g.strokeStyle=accent;g.stroke();
+  // nombre
+  let nombre=x.r.nombre.toUpperCase(),fs=118;g.font='700 '+fs+'px Oswald';while(g.measureText(nombre).width>W-120&&fs>60){fs-=4;g.font='700 '+fs+'px Oswald';}
+  txt(g,nombre,W/2,716,'700 '+fs+'px Oswald',C.chalk);
+  const meta=[x.r.num!=null?'#'+x.r.num:'',x.r.pos].filter(Boolean).join(' · ');
+  txt(g,meta.toUpperCase(),W/2,762,'600 34px Inter',C.dim,'center',3.5);
+  // línea principal
+  const [big,cap]=hero(x);
+  g.font='700 132px Oswald';const bw=g.measureText(big).width;g.font='500 34px Oswald';if('letterSpacing' in g)g.letterSpacing='3px';const cw=g.measureText(cap.toUpperCase()).width;if('letterSpacing' in g)g.letterSpacing='0px';
+  const tot=bw+26+cw,x0=(W-tot)/2;
+  txt(g,big,x0,920,'700 132px Oswald',accent,'left');txt(g,cap.toUpperCase(),x0+bw+26,918,'500 34px Oswald',C.chalk,'left',3);
+  // tiles
+  const T=tiles(x),tw2=(W-128-54)/4;
+  T.forEach((t,i)=>{const tx=64+i*(tw2+18);rr(g,tx,955,tw2,156,14);g.fillStyle='rgba(243,240,230,0.07)';g.fill();g.lineWidth=2;g.strokeStyle='rgba(243,240,230,0.28)';g.stroke();
+    txt(g,String(t[0]),tx+tw2/2,1040,'700 84px Oswald',C.chalk);txt(g,t[1].toUpperCase(),tx+tw2/2,1090,'600 23px Inter',C.dim,'center',2.5);});
+  // pie
+  g.fillStyle='rgba(16,32,26,0.92)';g.fillRect(0,1198,W,152);g.fillStyle=accent;g.fillRect(0,1198,W,3);
+  let xx=64;const parts=[[team.toUpperCase(),'500 30px Oswald',C.dim,3],[String(pf),'700 76px Oswald',C.chalk,0],['–','500 50px Oswald',C.dim,0],[String(pc),'700 76px Oswald',C.chalk,0],[rival.toUpperCase(),'500 30px Oswald',C.dim,3]];
+  for(const [t,f,c,ls] of parts){g.font=f;if('letterSpacing' in g)g.letterSpacing=ls+'px';const w=g.measureText(t).width;if('letterSpacing' in g)g.letterSpacing='0px';txt(g,t,xx,1296,f,c,'left',ls);xx+=w+24;}
+  const res=pf>pc?'VICTORIA':pf<pc?'DERROTA':'EMPATE';
+  txt(g,res,W-64,1270,'700 42px Oswald',accent,'right',4);txt(g,fecha.toUpperCase(),W-64,1310,'500 23px Inter',C.dim,'right',1.5);
+  return cv;
+}
+
+async function main(){
+  const msg=document.getElementById('msg'),grid=document.getElementById('grid');
+  if(!gameId){msg.textContent='Falta el juego (?game=ID).';return;}
+  document.getElementById('back').href='/partido.html?id='+gameId;
+  try{
+    const [sheet,team]=await Promise.all([fetch('/api/games/'+gameId+'/sheet').then(r=>r.json()),fetch('/api/team').then(r=>r.json()).catch(()=>({}))]);
+    const gm=sheet.game||sheet.juego||sheet;
+    const nombre=pick(team,'name','nombre')||'Mi Equipo';
+    const accent=pick(team,'color','primary_color','accent')||'#E0AE45';
+    const logoSrc=pick(team,'logo');
+    const logo=logoSrc?await loadImg(logoSrc):null;
+    const rival=pick(gm,'rival','opponent','rival_name')||'Rival';
+    const pf=n(pick(gm,'runs_for','carreras_favor','score_us','us','home_score')),pc=n(pick(gm,'runs_against','carreras_contra','score_them','them','away_score'));
+    const d=pick(gm,'fecha','date');const fecha=(d?new Date(String(d).slice(0,10)+'T12:00:00'):new Date()).toLocaleDateString('es-DO',{weekday:'short',day:'numeric',month:'short',year:'numeric'}).replace(/\./g,'');
+    await Promise.all(['500 20px Inter','600 20px Inter','500 20px Oswald','600 20px Oswald','700 20px Oswald'].map(f=>document.fonts.load(f)));
+    const top=elegir(sheet);
+    if(!top.length){msg.textContent='Este juego todavía no tiene jugadas registradas.';return;}
+    msg.textContent='Toca “Compartir” para publicar, o “Descargar” para guardar la imagen.';
+    for(let i=0;i<top.length;i++){
+      const cv=await dibujar(top[i],i,{team:nombre,accent,logo,rival,pf,pc,fecha});
+      const it=document.createElement('div');it.className='item';it.appendChild(cv);
+      const fn='destacado-'+(i+1)+'-'+top[i].r.nombre.replace(/\s+/g,'_')+'.png';
+      const b=document.createElement('div');b.className='btns';
+      b.innerHTML='<button class="sec">Descargar</button><button>Compartir</button>';
+      const [bd,bs]=b.children;
+      const blob=()=>new Promise(r=>cv.toBlob(r,'image/png'));
+      bd.onclick=async()=>{const a=document.createElement('a');a.href=URL.createObjectURL(await blob());a.download=fn;a.click();};
+      bs.onclick=async()=>{const f=new File([await blob()],fn,{type:'image/png'});
+        if(navigator.canShare&&navigator.canShare({files:[f]}))try{await navigator.share({files:[f],text:nombre});}catch(e){}else bd.click();};
+      it.appendChild(b);grid.appendChild(it);
+    }
+  }catch(e){msg.textContent='No se pudo generar: '+e.message;}
+}
+main();
+})();
+</script>
+</body>
+</html>
