@@ -168,6 +168,18 @@ def ver_juego(game_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, "Juego no encontrado")
     return {"game": g, "lineup": _orden(db, game_id)}
 
+@app.get("/api/games/{game_id}/career")
+def promedio_de_por_vida(game_id: int, db: Session = Depends(get_db)):
+    """AB y H de cada jugador ANTES de este juego (la página le suma lo de hoy)."""
+    from stats import calcular as _calcular
+    total = {r["player_id"]: r for r in _calcular(db)["bateo"]}
+    actual = {r["player_id"]: r for r in _calcular(db, game_id=game_id)["bateo"]}
+    salida = {}
+    for pid, r in total.items():
+        a = actual.get(pid)
+        salida[pid] = {"ab": r["AB"] - (a["AB"] if a else 0),
+                       "h": r["H"] - (a["H"] if a else 0)}
+    return salida
 
 @app.put("/api/games/{game_id}")
 def editar_juego(game_id: int, data: schemas.GameIn, db: Session = Depends(get_db)):
@@ -584,12 +596,42 @@ def listar_equipos(db: Session = Depends(get_db)):
     return [{"id": e.id, "name": e.name, "is_mine": e.is_mine}
             for e in db.query(models.Team).order_by(models.Team.name).all()]
 
+def _sincronizar_vivos(db, juegos):
+    """Copia al juego del torneo el marcador de su juego en vivo vinculado."""
+    cambio = False
+    for g in juegos:
+        if not g.game_id:
+            continue
+        vivo = db.get(models.Game, g.game_id)
+        if not vivo:
+            g.game_id = None
+            cambio = True
+            continue
+        mio = db.query(models.Team).filter(
+            models.Team.id.in_([g.home_team_id, g.away_team_id]),
+            models.Team.is_mine == True).first()
+        if not mio:
+            continue
+        if vivo.status == "finalizado":
+            nuestro, rival = vivo.our_score or 0, vivo.opp_score or 0
+            home, away = (nuestro, rival) if mio.id == g.home_team_id else (rival, nuestro)
+            if (g.home_score, g.away_score, g.status) != (home, away, "finalizado"):
+                g.home_score, g.away_score, g.status = home, away, "finalizado"
+                cambio = True
+        elif g.status == "finalizado":
+            g.home_score = g.away_score = None
+            g.status = "programado"
+            cambio = True
+    if cambio:
+        db.commit()
+
 
 @app.get("/api/tournaments")
 def listar_torneos(db: Session = Depends(get_db)):
     salida = []
     for t in db.query(models.Tournament).order_by(models.Tournament.id.desc()).all():
         juegos = db.query(models.TournamentGame).filter_by(tournament_id=t.id).all()
+        _sincronizar_vivos(db, juegos)
         salida.append({
             "id": t.id, "name": t.name, "start_date": t.start_date,
             "end_date": t.end_date, "location": t.location, "status": t.status,
@@ -648,6 +690,7 @@ def ver_torneo(tid: int, db: Session = Depends(get_db)):
     juegos = (db.query(models.TournamentGame).filter_by(tournament_id=tid)
                 .order_by(models.TournamentGame.date, models.TournamentGame.time,
                           models.TournamentGame.id).all())
+    _sincronizar_vivos(db, juegos)
     nombres = {e.id: e.name for e in equipos}
     return {
         "tournament": t,
@@ -659,6 +702,7 @@ def ver_torneo(tid: int, db: Session = Depends(get_db)):
             "home_name": nombres.get(g.home_team_id, "?"),
             "away_name": nombres.get(g.away_team_id, "?"),
             "home_score": g.home_score, "away_score": g.away_score,
+            "game_id": g.game_id,
         } for g in juegos],
         "standings": _posiciones(equipos, juegos),
     }
@@ -732,6 +776,57 @@ def resultado_juego_torneo(gid: int, data: schemas.TournamentResultIn,
     db.commit()
     return {"ok": True}
 
+
+@app.post("/api/tournament-games/{gid}/live")
+def juego_torneo_en_vivo(gid: int, db: Session = Depends(get_db)):
+    g = db.get(models.TournamentGame, gid)
+    if not g:
+        raise HTTPException(404, "Juego no encontrado")
+    if g.game_id and db.get(models.Game, g.game_id):
+        raise HTTPException(400, "Este juego ya tiene un juego en vivo")
+    mio = db.query(models.Team).filter(
+        models.Team.id.in_([g.home_team_id, g.away_team_id]),
+        models.Team.is_mine == True).first()
+    if not mio:
+        raise HTTPException(400, "Este juego no incluye a tu equipo")
+    rival_id = g.away_team_id if mio.id == g.home_team_id else g.home_team_id
+    rival = db.get(models.Team, rival_id)
+    temporada = db.query(models.Season).filter_by(active=True).first()
+    vivo = models.Game(date=g.date, time=g.time, location=g.location,
+                       opponent=rival.name if rival else "Rival",
+                       status="programado",
+                       season_id=temporada.id if temporada else None)
+    db.add(vivo)
+    db.flush()
+    # orden al bate: se copia el del último juego; si no hay, los jugadores activos
+    previo = (db.query(models.LineupSlot.game_id)
+                .filter(models.LineupSlot.game_id != vivo.id)
+                .order_by(models.LineupSlot.game_id.desc()).first())
+    if previo:
+        slots = (db.query(models.LineupSlot).filter_by(game_id=previo[0])
+                   .order_by(models.LineupSlot.batting_order).all())
+        for s in slots:
+            db.add(models.LineupSlot(game_id=vivo.id, batting_order=s.batting_order,
+                                     player_id=s.player_id, position=s.position))
+    else:
+        activos = (db.query(models.Player).filter_by(active=True)
+                     .order_by(models.Player.number, models.Player.id).all())
+        for i, p in enumerate(activos, 1):
+            db.add(models.LineupSlot(game_id=vivo.id, batting_order=i,
+                                     player_id=p.id, position=p.position))
+    g.game_id = vivo.id
+    db.commit()
+    return {"game_id": vivo.id}
+
+
+@app.post("/api/tournament-games/{gid}/unlink")
+def desvincular_juego_torneo(gid: int, db: Session = Depends(get_db)):
+    g = db.get(models.TournamentGame, gid)
+    if not g:
+        raise HTTPException(404, "Juego no encontrado")
+    g.game_id = None
+    db.commit()
+    return {"ok": True}
 
 @app.post("/api/tournament-games/{gid}/reopen")
 def reabrir_juego_torneo(gid: int, db: Session = Depends(get_db)):

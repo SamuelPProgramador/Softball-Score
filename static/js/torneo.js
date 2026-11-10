@@ -146,11 +146,38 @@
       }
 
       var acts = el("div", "game-actions");
-      var res = el("button", "btn-link", g.status === "finalizado" ? "Editar resultado" : "Anotar resultado");
-      res.type = "button";
-      res.addEventListener("click", function () { openResult(g); });
-      acts.appendChild(res);
-      if (g.status === "finalizado") {
+      var mineSide = data.teams.some(function (t) {
+        return t.is_mine && (t.id === g.home_team_id || t.id === g.away_team_id);
+      });
+      if (g.game_id) {
+        var live = el("a", "btn-link", g.status === "finalizado" ? "Ver juego" : "Abrir juego en vivo");
+        live.href = "/static/partido.html?game=" + g.game_id;
+        acts.appendChild(live);
+        if (g.status === "finalizado") {
+          var hoja = el("a", "btn-link", "Hoja");
+          hoja.href = "/static/reportes.html?game=" + g.game_id;
+          acts.appendChild(hoja);
+          var dest = el("a", "btn-link", "Destacados");
+          dest.href = "/static/destacados.html?game=" + g.game_id;
+          acts.appendChild(dest);
+        }
+        var un = el("button", "btn-link", "Desvincular");
+        un.type = "button";
+        un.addEventListener("click", function () { unlinkGame(g); });
+        acts.appendChild(un);
+      } else {
+        if (mineSide && g.status !== "finalizado") {
+          var go = el("button", "btn-link", "Jugar en vivo");
+          go.type = "button";
+          go.addEventListener("click", function () { startLive(g); });
+          acts.appendChild(go);
+        }
+        var res = el("button", "btn-link", g.status === "finalizado" ? "Editar resultado" : "Anotar resultado");
+        res.type = "button";
+        res.addEventListener("click", function () { openResult(g); });
+        acts.appendChild(res);
+      }
+      if (g.status === "finalizado" && !g.game_id) {
         var re = el("button", "btn-link", "Reabrir");
         re.type = "button";
         re.addEventListener("click", function () { reopenGame(g); });
@@ -261,7 +288,24 @@
       toast("⚠ " + e.message);
     }
   }
+  async function startLive(g) {
+    try {
+      var r = await api("POST", "/api/tournament-games/" + g.id + "/live");
+      location.href = "/static/partido.html?game=" + r.game_id;
+    } catch (e) {
+      toast("⚠ " + e.message);
+    }
+  }
 
+  async function unlinkGame(g) {
+    if (!confirm("¿Desvincular del juego en vivo? El juego en vivo no se borra.")) return;
+    try {
+      await api("POST", "/api/tournament-games/" + g.id + "/unlink");
+      await load();
+    } catch (e) {
+      toast("⚠ " + e.message);
+    }
+  }
   // ---------- Equipos ----------
   function renderTeams() {
     var box = $("teamList");

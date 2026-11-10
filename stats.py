@@ -6,7 +6,7 @@ import json
 
 HITS = {"1B", "2B", "3B", "HR"}
 # No cuentan como turno oficial (AB): BB, HBP, SB y sacrificios
-NO_AB = {"BB", "HBP", "SB", "SF", "SH", "CS", "PR"}
+NO_AB = {"BB", "HBP", "SB", "SF", "SH", "CS", "PR", "PH"}
 
 INNINGS_POR_JUEGO = 7   # softball = 7, béisbol = 9 (para calcular la ERA)
 
@@ -44,7 +44,7 @@ def calcular(db: Session, game_id: Optional[int] = None, season_id: Optional[int
         r = p.result
         b = bateo[p.batter_id]
         juegos_bat[p.batter_id].add(p.game_id)
-        if r not in ("SB", "CS", "PR"):
+        if r not in ("SB", "CS", "PR", "PH"):
             b["PA"] += 1
         if r not in NO_AB:
             b["AB"] += 1

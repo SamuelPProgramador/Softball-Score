@@ -28,6 +28,25 @@
     return v.toFixed(3).replace(/^0/, "");
   }
 
+  function fmtLife(id, s) {
+    var c = career[id] || { ab: 0, h: 0 };
+    var ab = c.ab + s.ab, h = c.h + s.h;
+    return ab ? (h / ab).toFixed(3).replace(/^0/, "") : ".000";
+  }
+
+  var RESULT_TXT = { "1B": "Sencillo", "2B": "Doble", "3B": "Triple", HR: "Jonrón", BB: "Base por bolas",
+                     E: "Error", K: "Ponche", OUT: "Out", SF: "Fly de sacrificio", SH: "Toque de sacrificio", DP: "Doble play" };
+  var RESULT_KIND = { "1B": "hit", "2B": "hit", "3B": "hit", HR: "hit", BB: "neutral", E: "neutral",
+                      SF: "neutral", SH: "neutral", K: "out", OUT: "out", DP: "out" };
+
+  function logPlay(batter, result, runs, inning) {
+    var txt = RESULT_TXT[result] || result;
+    if (runs > 0 && result !== "DP") txt += " · " + runs + " CI";
+    recentLog.push({ inning: inning, who: "#" + batter.num + " " + batter.name, text: txt,
+                     kind: RESULT_KIND[result] || "neutral" });
+    if (recentLog.length > 3) recentLog.shift();
+  }
+
   function snapshot() {
     return JSON.parse(JSON.stringify({ stats: stats, pitching: pitching, state: state }));
   }
@@ -50,6 +69,8 @@
   var rosterOriginal = [];  // orden al bate con el que empezó el juego
   var seen = [];            // todos los que han bateado o corrido (original + sustitutos)
   var replacedIds = {};     // jugadores que ya salieron por un emergente
+  var recentLog = [];       // últimas jugadas al bate (para el resumen)
+  var career = {};          // AB y H de por vida ANTES de este juego
 
   function nameOf(id) {
     var p = roster.find(function (x) { return x.id === id; }) ||
@@ -168,6 +189,7 @@
     state.outs = 0;
     state.bases = [null, null, null];
     playIds = [];
+    recentLog = [];
     lastPlayCtx = null;
   }
 
@@ -207,7 +229,7 @@
       state.inning++;
       inningEnded = true;
     }
-
+    logPlay(batter, result, res.runs, inning);
     lastPlayCtx = { playId: null, result: result, batterId: batter.id,
                     bases: basesBefore, outs: outsBefore, moves: moves };
     return { batter: batter, inning: inning, runs: res.runs, outsMade: res.outs,
@@ -389,7 +411,7 @@
     var inning = state.inning;
     var outsBefore = state.outs;
     var basesBefore = state.bases.slice();
-    if (kind === "PR") substitute(moves[0].r, moves[0].p);
+    if (kind === "PR" || kind === "PH") substitute(moves[0].r, moves[0].p);
 
     var res = applyMoves(moves);
     state.ourScore += res.runs;
@@ -511,6 +533,92 @@
     });
   }
 
+  function openPinchHitter() {
+    if (readOnly) { toast("Juego finalizado: solo lectura"); return; }
+    if (roster.length === 0) return;
+    var oldId = currentBatter().id;
+    var candidates = pitchers.filter(function (p) {
+      return !roster.some(function (r) { return r.id === p.id; }) && !replacedIds[p.id];
+    });
+    if (candidates.length === 0) { toast("No hay jugadores disponibles en la banca"); return; }
+
+    var back = document.createElement("div");
+    back.className = "modal-backdrop";
+    var box = document.createElement("div");
+    box.className = "modal";
+    var title = document.createElement("div");
+    title.className = "modal-title";
+    title.textContent = "Bateador emergente";
+    var sub = document.createElement("div");
+    sub.className = "modal-sub";
+    sub.textContent = "Batea por " + nameOf(oldId) + " y ocupa su lugar en el orden al bate.";
+    var sel = document.createElement("select");
+    sel.className = "pitcher-select";
+    candidates.forEach(function (p) {
+      var o = document.createElement("option");
+      o.value = p.id;
+      o.textContent = "#" + p.num + " " + p.name;
+      sel.appendChild(o);
+    });
+    var actions = document.createElement("div");
+    actions.className = "form-actions";
+    var ok = document.createElement("button");
+    ok.className = "btn";
+    ok.type = "button";
+    ok.textContent = "Aceptar";
+    var cancel = document.createElement("button");
+    cancel.className = "btn secondary";
+    cancel.type = "button";
+    cancel.textContent = "Cancelar";
+    actions.appendChild(ok);
+    actions.appendChild(cancel);
+    box.appendChild(title);
+    box.appendChild(sub);
+    box.appendChild(sel);
+    box.appendChild(actions);
+    back.appendChild(box);
+    document.body.appendChild(back);
+
+    function close() { document.body.removeChild(back); }
+    cancel.addEventListener("click", close);
+    back.addEventListener("click", function (e) { if (e.target === back) close(); });
+    ok.addEventListener("click", function () {
+      var newId = parseInt(sel.value, 10);
+      var msg = nameOf(newId) + " batea por " + nameOf(oldId);
+      close();
+      sendEvent("PH", [{ p: newId, f: 0, t: 5, r: oldId }], msg);
+    });
+  }
+
+  function renderRecent() {
+    var box = document.getElementById("recentList");
+    box.innerHTML = "";
+    if (recentLog.length === 0) {
+      var empty = document.createElement("div");
+      empty.className = "lineup-row";
+      empty.textContent = "Aún no hay jugadas.";
+      box.appendChild(empty);
+      return;
+    }
+    recentLog.slice().reverse().forEach(function (r) {
+      var row = document.createElement("div");
+      row.className = "lineup-row";
+      var inn = document.createElement("span");
+      inn.className = "recent-inn";
+      inn.textContent = "E" + r.inning;
+      var who = document.createElement("span");
+      who.className = "lineup-name";
+      who.textContent = r.who;
+      var res = document.createElement("span");
+      res.className = "recent-res " + r.kind;
+      res.textContent = r.text;
+      row.appendChild(inn);
+      row.appendChild(who);
+      row.appendChild(res);
+      box.appendChild(row);
+    });
+  }
+
   function renderRunners() {
     var box = document.getElementById("runnersList");
     box.innerHTML = "";
@@ -562,7 +670,7 @@
     plays.forEach(function (p) {
       var mv = null;
       if (p.moves) { try { mv = JSON.parse(p.moves); } catch (e) { mv = null; } }
-      if (p.result === "SB" || p.result === "CS" || p.result === "PR") {
+      if (p.result === "SB" || p.result === "CS" || p.result === "PR" || p.result === "PH") {
         if (mv) applyEvent(p.result, mv);
       } else {
         applyResult(p.result, mv);
@@ -624,6 +732,7 @@
       roster.forEach(function (r) {
         if (!pitchers.some(function (p) { return p.id === r.id; })) pitchers.push(r);
       });
+      try { career = await api("GET", "/api/games/" + gameId + "/career"); } catch (e) { career = {}; }
       var pit = roster.find(function (p) { return p.pos === "P"; }) || pitchers[0];
       state.currentPitcherId = pit.id;
 
@@ -668,7 +777,8 @@
     document.getElementById("batterName").textContent = b.name;
     document.getElementById("batterPos").textContent = b.pos;
     document.getElementById("batterLine").innerHTML =
-      "<b>" + s.ab + "</b> AB · <b>" + s.h + "</b> H · <b>" + s.rbi + "</b> CI · AVG <b>" + fmtAvg(s) + "</b>";
+      "<b>" + s.ab + "</b> AB · <b>" + s.h + "</b> H · <b>" + s.rbi + "</b> CI<br>" +
+      "Hoy <b>" + fmtAvg(s) + "</b> · De por vida <b>" + fmtLife(b.id, s) + "</b>";
     var card = document.getElementById("batterCard");
     card.classList.add("flash");
     setTimeout(function () { card.classList.remove("flash"); }, 250);
@@ -686,7 +796,8 @@
         '<span class="lineup-num">#' + p.num + '</span>' +
         '<span class="lineup-name">' + p.name + '</span>' +
         '<span class="lineup-pos">' + p.pos + '</span>' +
-        '<span class="lineup-stat">' + s.h + '-' + s.ab + '</span>';
+        '<span class="lineup-stat">' + s.h + '-' + s.ab + '</span>' +
+        '<span class="lineup-stat" title="Promedio de por vida">' + fmtLife(p.id, s) + '</span>';
       list.appendChild(row);
     });
   }
@@ -745,6 +856,7 @@
     renderScoreboard();
     renderBatter();
     renderLineup();
+    renderRecent();
     renderRunners();
     renderPitching();
     renderResumen();
@@ -778,6 +890,7 @@
     });
   });
 
+  document.getElementById("phBtn").addEventListener("click", openPinchHitter);
   document.getElementById("adjustBtn").addEventListener("click", openAdjust);
   document.getElementById("finishBtn").addEventListener("click", function () {
     if (readOnly) { location.href = "/static/juegos.html"; return; }

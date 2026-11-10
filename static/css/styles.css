@@ -586,3 +586,37 @@ tr.total td { font-weight: 700; border-top: 1px solid var(--line-strong); }
 
 /* Torneos */
 tr.mine td { color: var(--amber); font-weight: 700; }
+
+
+/* ===== Mejor contraste (uso al sol / tablet / celular) ===== */
+:root {
+  --chalk-dim: #DDE2DB;
+  --line: rgba(243,240,230,0.24);
+  --line-strong: rgba(243,240,230,0.45);
+}
+.outcome-btn.neutral,
+.stepper-btn,
+.btn.secondary { background: #3C7459; border-color: rgba(243,240,230,0.55); }
+.outcome-btn { font-size: 16px; }
+.outcome-btn.out { border-color: #E58B80; }
+.out-dot { border-width: 2px; width: 15px; height: 15px; }
+.base { border-width: 2px; }
+.stepper-btn { width: 32px; height: 32px; font-size: 18px; }
+.batter-line, .diamond-label, .lineup-pos, .hint, .field-label,
+.sb-score-label, .sb-outs-label, .tile-label, .leader-title, .leader-sub { font-size: 13px; }
+.btn-link { font-size: 13px; }
+.btn-link.danger { color: #F29A8E; }
+.badge { color: var(--chalk); border-color: rgba(243,240,230,0.55); font-size: 11px; }
+.lineup-row.current { box-shadow: inset 4px 0 0 var(--amber); }
+.cal-day { border-color: var(--line-strong); }
+.cal-chip.done { color: var(--chalk); }
+.pill.e { color: var(--chalk); }
+th { color: var(--chalk); }
+
+
+/* Últimas jugadas */
+.recent-inn { font-family: var(--font-display); color: var(--chalk-dim); min-width: 34px; }
+.recent-res { font-size: 13px; font-weight: 600; text-align: right; }
+.recent-res.hit { color: var(--amber); }
+.recent-res.out { color: #F29A8E; }
+.recent-res.neutral { color: var(--chalk); }
